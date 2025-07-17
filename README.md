@@ -1,1 +1,3 @@
 # menara_service
+
+Configurations
