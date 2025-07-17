@@ -24,18 +24,14 @@ FROM golang:1.23.1-alpine
 
 WORKDIR /app
 
-# Copy & install dependency
+ARG CACHEBUST=1
+
 COPY go.mod go.sum ./
 RUN go mod tidy
 
-# Copy semua source code ke dalam container
 COPY . .
-
-# Build binary
 RUN go build -o main .
 
-# Railway akan memberikan PORT dari environment
 EXPOSE 8080
 
-# Jalankan aplikasi
 CMD ["./main"]
