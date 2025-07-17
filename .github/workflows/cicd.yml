@@ -12,4 +12,20 @@ jobs:
       - name: Checkout Source
         uses: actions/checktout@v4
       - name: Create .env file
-        run: echo "PORT=${{ secrets.PORT }}"
+        run: echo "PORT=${{ secrets.PORT }}" >> .env
+      - name: Login to docker hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build docker image
+        run: docker build -t daman07/oleh-oleh-medan .
+      - name: Push image to docker hub
+        run: docker push daman07/oleh-oleh-medan:latest
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Pull docker image
+        run: docker pull daman07/oleh-oleh-medan:latest
+      - name: Delete old container
+        run: docker rm -f nusantara-container
+      - name: Run docker container
+        run: docker run -d -p 8080:8080 --name nusantara-container daman07/oleh-oleh-medan
