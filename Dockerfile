@@ -2,16 +2,20 @@ FROM golang:1.23.1-alpine
 
 WORKDIR /app
 
-COPY go.mod go.sum
+# COPY file mod ke /app
+COPY go.mod go.sum ./
 
+# Install dependency
 RUN go mod tidy
 
+# Copy semua isi project ke container
 COPY . .
 
-RUN go build -o main ./main.go
+# Build binary
+RUN go build -o main .
 
-RUN chmod +x main
-
+# Expose port (jika kamu pakai port 8080 misalnya)
 EXPOSE 8080
 
-CMD [ "./main" ]
+# Jalankan aplikasi
+CMD ["./main"]
