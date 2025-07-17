@@ -22,6 +22,10 @@ func main() {
 
 	e.Use(middlewares.LoggerMiddleware)
 
+	for _, r := range e.Routes() {
+		log.Printf("ROUTE %s %s", r.Method, r.Path)
+	}
+
 	routes.Routes(e, db, rdb)
 
 	port := os.Getenv("PORT")
