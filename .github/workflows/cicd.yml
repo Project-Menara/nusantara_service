@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
-        uses: actions/checktout@v4
+        uses: actions/checkout@v4
       - name: Create .env file
         run: echo "PORT=${{ secrets.PORT }}" >> .env
       - name: Login to docker hub
