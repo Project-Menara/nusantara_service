@@ -1,0 +1,15 @@
+name: Deploy Go Application
+
+on:
+  push:
+    branches:
+      - deploy-to-ec2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source
+        uses: actions/checktout@v4
+      - name: Create .env file
+        run: echo "PORT=${{ secrets.PORT }}"

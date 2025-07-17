@@ -1,0 +1,37 @@
+# Nama file binary yang akan dijalankan setelah build
+bin = "tmp/main.exe"
+
+# Konfigurasi build
+[build]
+  # Perintah build yang dijalankan saat ada perubahan
+  cmd = "go build -o tmp/main.exe main.go"
+
+  # Ekstensi file yang akan dipantau untuk perubahan
+  include_ext = ["go", "tpl", "tmpl", "html"]
+
+  # Folder yang akan diabaikan dari pemantauan
+  exclude_dir = ["vendor", "tmp", "bin", ".git", "node_modules"]
+
+  # Tambahan opsi (opsional)
+  delay = 1000 # delay 1 detik (ms)
+  force_polling = false
+  follow_symlink = true
+
+# Konfigurasi logger
+[log]
+  time = true
+  color = true
+
+# Warna untuk label di log
+[color]
+  main = "yellow"
+  watcher = "cyan"
+  build = "green"
+  runner = "magenta"
+
+# Konfigurasi perintah yang dijalankan
+[run]
+  cmd = "tmp/main.exe"
+  watch_dir = "."
+  watch_ext = ["go"]
+  ignore = ["tmp/*", "bin/*"]
