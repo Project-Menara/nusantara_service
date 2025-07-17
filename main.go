@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 func main() {
@@ -21,6 +22,10 @@ func main() {
 	e := echo.New()
 
 	e.Use(middlewares.LoggerMiddleware)
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.PATCH},
+	}))
 
 	for _, r := range e.Routes() {
 		log.Printf("ROUTE %s %s", r.Method, r.Path)
