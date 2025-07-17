@@ -5,6 +5,7 @@ import (
 	"nusantara_service/configs"
 	"nusantara_service/internal/middlewares"
 	"nusantara_service/routes"
+	"os"
 
 	"github.com/labstack/echo/v4"
 )
@@ -23,5 +24,10 @@ func main() {
 
 	routes.Routes(e, db, rdb)
 
-	log.Fatal(e.Start(":8080"))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Fatal(e.Start(":" + port))
+
 }
