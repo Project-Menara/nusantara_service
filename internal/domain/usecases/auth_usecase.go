@@ -30,12 +30,11 @@ func (a *authService) Register(ctx context.Context, req dto.RegisterRequest) err
 		return err
 	}
 
-	user := &entities.User{
+	user := &entities.UserEntity{
 		ID:        uuid.NewString(),
 		Name:      req.Name,
 		Email:     req.Email,
 		Password:  hashed,
-		Role:      "superadmin",
 		CreatedAt: time.Now(),
 	}
 
