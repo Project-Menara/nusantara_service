@@ -77,12 +77,13 @@ func (r *roleService) GetByIdRole(ctx context.Context, id uuid.UUID) (*entities.
 		}
 		return nil, err
 	}
+
 	return role, nil
 }
 
 // UpdateRole implements services.RoleService.
-func (r *roleService) UpdateRole(ctx context.Context, req dto.UpdateRoleRequest) (*entities.RoleEntity, error) {
-	role, err := r.repo.FindById(ctx, req.ID)
+func (r *roleService) UpdateRole(ctx context.Context, id uuid.UUID, req dto.UpdateRoleRequest) (*entities.RoleEntity, error) {
+	role, err := r.repo.FindById(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("role not found")
@@ -90,11 +91,16 @@ func (r *roleService) UpdateRole(ctx context.Context, req dto.UpdateRoleRequest)
 		return nil, err
 	}
 	existingRole, err := r.repo.FindByName(ctx, req.Name)
-	if err == nil && existingRole.ID != req.ID {
+	if err == nil && existingRole.ID != id {
 		return nil, errors.New("role already exists")
 	}
 
 	role.Name = req.Name
-	return r.repo.Update(ctx, req.ID, role)
+	updatedRole, err := r.repo.Update(ctx, id, role)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedRole, nil
 
 }

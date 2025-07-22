@@ -16,4 +16,8 @@ func RoleRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client) {
 	roleHandler := handlers.NewRoleHandler(roleService)
 
 	e.POST("/create", roleHandler.CreateRole)
+	e.GET("", roleHandler.GetAllRole)
+	e.GET("/:id", roleHandler.GetByIdRole)
+	e.PUT("/:id/edit", roleHandler.UpdateRole)
+	e.DELETE("/:id/delete", roleHandler.DeleteRole)
 }
