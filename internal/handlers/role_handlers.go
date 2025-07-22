@@ -6,6 +6,7 @@ import (
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/dto"
 	"nusantara_service/internal/response"
+	"nusantara_service/internal/utils"
 	"strings"
 
 	"github.com/google/uuid"
@@ -40,12 +41,16 @@ func (r *RoleHandler) CreateRole(c echo.Context) error {
 }
 
 func (r *RoleHandler) GetAllRole(c echo.Context) error {
-	roles, err := r.RoleService.GetAllRole(c.Request().Context())
+	pageInt, limitInt := utils.ParsePaginationParams(c)
+
+	roles, total, err := r.RoleService.GetAllRole(c.Request().Context(), pageInt, limitInt)
 	if err != nil {
 		return response.Error(c, http.StatusInternalServerError, "failed to fetch roles", err)
 	}
 
-	return response.Success(c, 200, "Get All Role Success", roles)
+	meta := utils.BuildPaginationMeta(c, pageInt, limitInt, total)
+
+	return response.PaginatedSuccess(c, 200, "Get All Role Success", roles, meta)
 
 }
 

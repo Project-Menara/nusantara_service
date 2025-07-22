@@ -17,6 +17,17 @@ func NewRoleRepositoryImpl(db *gorm.DB) repositories.RoleRepository {
 	return &RoleRepositoryImpl{db: db}
 }
 
+// CountAll implements repositories.RoleRepository.
+func (r *RoleRepositoryImpl) CountAll(ctx context.Context) (int, error) {
+	var count int64
+	var roles entities.RoleEntity
+	if err := r.db.WithContext(ctx).Model(&roles).Count(&count).Error; err != nil {
+		return 0, nil
+	}
+
+	return int(count), nil
+}
+
 func (r *RoleRepositoryImpl) Create(ctx context.Context, role *entities.RoleEntity) (*entities.RoleEntity, error) {
 	err := r.db.WithContext(ctx).Create(role)
 	if err != nil {
@@ -36,9 +47,9 @@ func (r *RoleRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 // FindAll implements repositories.RoleRepository.
-func (r *RoleRepositoryImpl) FindAll(ctx context.Context) ([]*entities.RoleEntity, error) {
+func (r *RoleRepositoryImpl) FindAll(ctx context.Context, limit, offset int) ([]*entities.RoleEntity, error) {
 	var roles []*entities.RoleEntity
-	if err := r.db.WithContext(ctx).Find(&roles).Error; err != nil {
+	if err := r.db.WithContext(ctx).Limit(limit).Offset(offset).Find(&roles).Error; err != nil {
 		return nil, err
 	}
 

@@ -59,13 +59,19 @@ func (r *roleService) DeleteRole(ctx context.Context, id uuid.UUID) error {
 }
 
 // GetAllRole implements services.RoleService.
-func (r *roleService) GetAllRole(ctx context.Context) ([]*entities.RoleEntity, error) {
-	roles, err := r.repo.FindAll(ctx)
+func (r *roleService) GetAllRole(ctx context.Context, page, limit int) ([]*entities.RoleEntity, int, error) {
+	offset := (page - 1) * limit
+	roles, err := r.repo.FindAll(ctx, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return roles, nil
+	total, err := r.repo.CountAll(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return roles, total, nil
 }
 
 // GetByIdRole implements services.RoleService.

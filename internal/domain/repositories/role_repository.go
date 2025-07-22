@@ -9,10 +9,11 @@ import (
 
 type RoleRepository interface {
 	Create(ctx context.Context, role *entities.RoleEntity) (*entities.RoleEntity, error)
-	FindAll(ctx context.Context) ([]*entities.RoleEntity, error)
+	FindAll(ctx context.Context, limit, offset int) ([]*entities.RoleEntity, error)
 	FindById(ctx context.Context, Id uuid.UUID) (*entities.RoleEntity, error)
 	Update(ctx context.Context, id uuid.UUID, updated *entities.RoleEntity) (*entities.RoleEntity, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 
 	FindByName(ctx context.Context, name string) (*entities.RoleEntity, error)
+	CountAll(ctx context.Context) (int, error)
 }
