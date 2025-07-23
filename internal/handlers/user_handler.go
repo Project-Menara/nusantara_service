@@ -75,7 +75,7 @@ func (h *UserHandler) LoginAdmin(c echo.Context) error {
 		var attemptErr *response.LoginAttemptError
 		if errors.As(err, &attemptErr) {
 			return response.Error(c, http.StatusUnauthorized, attemptErr.Message, map[string]interface{}{
-				"remaining_attempts": attemptErr.RemainingAttempts,
+				"remaining_attempts": fmt.Sprintf("%s. Sisa %d percobaan lagi.", attemptErr.Message, attemptErr.RemainingAttempts),
 			})
 		}
 		return response.Error(c, http.StatusUnauthorized, err.Error(), "invalid login")

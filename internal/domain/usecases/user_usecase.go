@@ -80,19 +80,35 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 		return "", fmt.Errorf("failed to get TTL from redis: %w", err)
 	}
 
-	if ttl > 0 && attempts >= maxAttempts {
-		return "", &response.CooldownError{
-			Message:    "Too many login attempts, please try again later.",
-			RetryAfter: ttl,
+	if attempts >= maxAttempts {
+		if ttl > 0 {
+			return "", &response.CooldownError{
+				Message:    "Too many login attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
 		}
 	}
 
 	admin, err := u.repo.FindByEmail(ctx, req.Email)
 	if err != nil {
-		u.rdb.Incr(ctx, loginKey)
+		currentAttempts, err := u.rdb.Incr(ctx, loginKey).Result()
+		if err != nil {
+			return "", fmt.Errorf("failed to increment login attempts: %w", err)
+		}
 		u.rdb.Expire(ctx, loginKey, cooldownDuration)
 
-		remainingAttempts := maxAttempts - (attempts - 1)
+		if int(currentAttempts) >= maxAttempts {
+			ttl, _ := u.rdb.TTL(ctx, loginKey).Result()
+			if ttl <= 0 {
+				ttl = cooldownDuration
+			}
+			return "", &response.CooldownError{
+				Message:    "Too many login attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+
+		remainingAttempts := maxAttempts - int(currentAttempts)
 		if remainingAttempts < 0 {
 			remainingAttempts = 0
 		}
@@ -101,13 +117,29 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 			Message:           "email incorrect",
 			RemainingAttempts: remainingAttempts,
 		}
+
 	}
 
 	isPassword := utils.CheckPasswordHash(req.Password, admin.Password)
 	if !isPassword {
-		u.rdb.Incr(ctx, loginKey)
+		currentAttempts, err := u.rdb.Incr(ctx, loginKey).Result()
+		if err != nil {
+			return "", fmt.Errorf("failed to increment login attempts: %w", err)
+		}
 		u.rdb.Expire(ctx, loginKey, cooldownDuration)
-		remainingAttempts := maxAttempts - (attempts - 1)
+
+		if int(currentAttempts) >= maxAttempts {
+			ttl, _ := u.rdb.TTL(ctx, loginKey).Result()
+			if ttl <= 0 {
+				ttl = cooldownDuration // fallback
+			}
+			return "", &response.CooldownError{
+				Message:    "Too many login attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+
+		remainingAttempts := maxAttempts - int(currentAttempts)
 		if remainingAttempts < 0 {
 			remainingAttempts = 0
 		}
@@ -116,6 +148,7 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 			Message:           "password incorrect",
 			RemainingAttempts: remainingAttempts,
 		}
+
 	}
 
 	u.rdb.Del(ctx, loginKey)
