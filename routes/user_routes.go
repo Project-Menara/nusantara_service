@@ -20,4 +20,5 @@ func UserRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client) {
 	e.POST("/admin/login", authHandler.LoginAdmin)
 	e.GET("/admin/me", authHandler.GetProfileAdmin, middlewares.JWTMiddleware(rdb))
 	e.POST("/admin/logout", authHandler.LogoutAdmin, middlewares.JWTMiddleware(rdb))
+	e.PUT("/admin/change-password", authHandler.ChangePasswordSuperAdmin, middlewares.JWTMiddleware(rdb))
 }

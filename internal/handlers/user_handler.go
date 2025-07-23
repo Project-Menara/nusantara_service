@@ -41,7 +41,7 @@ func (h *UserHandler) RegisterAdmin(c echo.Context) error {
 
 	data, err := h.UserService.RegisterAdmin(c.Request().Context(), req)
 	if err != nil {
-		return response.Error(c, http.StatusInternalServerError, "internal server error", err.Error())
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "internal server error")
 	}
 
 	return response.Success(c, http.StatusCreated, "admin registered", *data)
@@ -63,7 +63,7 @@ func (h *UserHandler) LoginAdmin(c echo.Context) error {
 
 	token, err := h.UserService.LoginAdmin(c.Request().Context(), req)
 	if err != nil {
-		return response.Error(c, http.StatusUnauthorized, "invalid login", err.Error())
+		return response.Error(c, http.StatusUnauthorized, err.Error(), "invalid login")
 	}
 
 	return response.Success(c, http.StatusOK, "login success", token)
@@ -117,11 +117,52 @@ func (h *UserHandler) LogoutAdmin(c echo.Context) error {
 	// Blacklist the token
 	if token != "" {
 		if err := h.UserService.LogoutAdmin(ctx, token); err != nil { // Use request context
-			return response.Error(c, http.StatusInternalServerError, "internal server error", err.Error())
+			return response.Error(c, http.StatusInternalServerError, err.Error(), "internal server error")
 		}
 	} else {
 		return response.Error(c, http.StatusUnauthorized, "Unauthorized: Token is empty", nil) // More specific error
 	}
 
 	return response.Success(c, http.StatusOK, "Logout Success", nil)
+}
+
+func (h *UserHandler) ChangePasswordSuperAdmin(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	userID := claims["user_id"].(string)
+
+	authHeader := c.Request().Header.Get("Authorization")
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	var req dto.ChangePasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "Failed to bind request", err.Error())
+	}
+
+	if strings.TrimSpace(req.CurrentPassword) == "" {
+		return response.Error(c, http.StatusBadRequest, "current password is required", nil)
+	}
+
+	if strings.TrimSpace(req.NewPassword) == "" {
+		return response.Error(c, http.StatusBadRequest, "new password is required", nil)
+	}
+	if strings.TrimSpace(req.ConfirmationPassword) == "" {
+		return response.Error(c, http.StatusBadRequest, "confirmation password is required", nil)
+	}
+
+	userUpdate, err := h.UserService.ChangePasswordSuperAdmin(c.Request().Context(), userID, token, req)
+	if err != nil {
+		return response.Error(c, http.StatusInternalServerError, err.Error(), nil)
+	}
+
+	return response.Success(c, http.StatusOK, "change password success", userUpdate)
 }

@@ -12,3 +12,9 @@ type LoginAdminRequest struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
+
+type ChangePasswordRequest struct {
+	CurrentPassword      string `json:"current_password"`
+	NewPassword          string `json:"new_password"`
+	ConfirmationPassword string `json:"confirmation_password"`
+}

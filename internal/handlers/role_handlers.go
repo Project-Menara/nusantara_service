@@ -33,7 +33,7 @@ func (r *RoleHandler) CreateRole(c echo.Context) error {
 
 	newRole, err := r.RoleService.CreateRole(c.Request().Context(), req)
 	if err != nil {
-		return response.Error(c, http.StatusInternalServerError, "internal server error", err)
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "internal server error")
 	}
 	fmt.Printf("DEBUG newRole: %+v\n", newRole)
 
@@ -85,7 +85,7 @@ func (r *RoleHandler) UpdateRole(c echo.Context) error {
 
 	updateRole, err := r.RoleService.UpdateRole(c.Request().Context(), roleId, req)
 	if err != nil {
-		return response.Error(c, 500, "Failed to update role", err.Error())
+		return response.Error(c, 500, err.Error(), "Failed to update role")
 	}
 
 	return response.Success(c, 200, "update success", updateRole)
@@ -98,7 +98,7 @@ func (r *RoleHandler) DeleteRole(c echo.Context) error {
 	}
 
 	if err := r.RoleService.DeleteRole(c.Request().Context(), roleId); err != nil {
-		return response.Error(c, 400, "failed to delete role", err.Error())
+		return response.Error(c, 400, err.Error(), "failed to delete role")
 	}
 
 	return response.Success(c, 200, "deleted success", nil)

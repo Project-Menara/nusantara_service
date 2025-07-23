@@ -80,7 +80,7 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 
 	token, err := utils.GenerateToken(admin.ID)
 	if err != nil {
-		return "", errors.New("failed to generatet token")
+		return "", errors.New("failed to generate token")
 	}
 
 	expiry, err := utils.GetExpiryFromToken(token)
@@ -97,7 +97,6 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 	return token, nil
 }
 
-// GetProfile implements services.UserService.
 func (u *userService) GetProfile(ctx context.Context, userId string, token string) (*entities.UserEntity, error) {
 	redis_key := fmt.Sprintf("admin_token:%s", userId)
 	storedToken, err := u.rdb.Get(ctx, redis_key).Result()
@@ -113,7 +112,6 @@ func (u *userService) GetProfile(ctx context.Context, userId string, token strin
 	return admin, nil
 }
 
-// LogoutAdmin implements services.UserService.
 func (u *userService) LogoutAdmin(ctx context.Context, token string) error {
 	expiry, err := utils.GetExpiryFromToken(token)
 	if err != nil {
@@ -123,10 +121,52 @@ func (u *userService) LogoutAdmin(ctx context.Context, token string) error {
 	blackListKey := fmt.Sprintf("blacklist:%s", token)
 	err = u.rdb.Set(ctx, blackListKey, "blacklisted", time.Until(expiry)).Err()
 	if err != nil {
-		return errors.New("failed to blacklist toke")
+		return errors.New("failed to blacklist token")
 	}
 
 	return nil
+}
+
+// ChangePasswordSuperAdmin implements services.UserService.
+func (u *userService) ChangePasswordSuperAdmin(ctx context.Context, userId string, token string, req dto.ChangePasswordRequest) (*entities.UserEntity, error) {
+	redis_key := fmt.Sprintf("admin_token:%s", userId)
+	storedToken, err := u.rdb.Get(ctx, redis_key).Result()
+	if err != nil || storedToken != token {
+		return nil, errors.New("invalid or expired session")
+	}
+
+	user, err := u.repo.FindUserById(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+
+	if !utils.CheckPasswordHash(req.CurrentPassword, user.Password) {
+		return nil, errors.New("invalid current password")
+	}
+	if req.NewPassword != req.ConfirmationPassword {
+		return nil, errors.New("new password and confirmation do not match")
+	}
+	if len(req.NewPassword) < 6 {
+		return nil, errors.New("new password must be at least 6 characters long")
+	}
+
+	hashedNewPassword, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		return nil, errors.New("failed to hash new password")
+	}
+
+	user.Password = hashedNewPassword
+
+	updateData, err := u.repo.ChangePassword(ctx, userId, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return updateData, nil
+
 }
 
 // CheckTokenBlacklisted implements services.UserService.

@@ -63,3 +63,19 @@ func (u *UserRepositoryImpl) FindUserById(ctx context.Context, userId string) (*
 
 	return &user, nil
 }
+
+// ChangePassword implements repositories.UserRepository.
+func (u *UserRepositoryImpl) ChangePassword(ctx context.Context, userId string, Updated *entities.UserEntity) (*entities.UserEntity, error) {
+	var user entities.UserEntity
+	if err := u.db.WithContext(ctx).Preload("Role").First(&user, "id = ?", userId).Error; err != nil {
+		return nil, err
+	}
+
+	user.Password = Updated.Password
+
+	if err := u.db.WithContext(ctx).Updates(&user).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
