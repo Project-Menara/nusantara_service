@@ -17,6 +17,7 @@ func NewUserRepositoryImpl(db *gorm.DB) repositories.UserRepository {
 	return &UserRepositoryImpl{db: db}
 }
 
+// SUPERADMIN
 // CreateAdmin implements repositories.UserRepository.
 func (u *UserRepositoryImpl) CreateAdmin(ctx context.Context, user *entities.UserEntity) (*entities.UserEntity, error) {
 	err := u.db.WithContext(ctx).Create(user).Error // Chain .Error here
@@ -79,3 +80,5 @@ func (u *UserRepositoryImpl) ChangePassword(ctx context.Context, userId string, 
 
 	return &user, nil
 }
+
+//END SUPERADMIN

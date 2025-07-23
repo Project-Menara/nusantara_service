@@ -8,6 +8,7 @@ import (
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
 	"nusantara_service/internal/dto"
+	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
 	"time"
 
@@ -24,6 +25,8 @@ type userService struct {
 func NewUserUsecase(repo repositories.UserRepository, rdb *redis.Client) services.UserService {
 	return &userService{repo: repo, rdb: rdb}
 }
+
+//SUPERADMIN
 
 // RegisterAdmin implements services.UserService.
 func (u *userService) RegisterAdmin(ctx context.Context, req dto.RegisterAdminRequest) (*entities.UserEntity, error) {
@@ -62,17 +65,38 @@ func (u *userService) RegisterAdmin(ctx context.Context, req dto.RegisterAdminRe
 // LoginAdmin implements services.UserService.
 func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest) (string, error) {
 	loginKey := fmt.Sprintf("login_attempts:%s", req.Email)
-	attempts, _ := u.rdb.Get(ctx, loginKey).Int()
-	if attempts >= 5 {
-		return "", errors.New("too many login attempts, please try again later")
+
+	const maxAttempts = 5
+	const cooldownDuration = 1 * time.Minute
+
+	attempts, err := u.rdb.Get(ctx, loginKey).Int()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return "", fmt.Errorf("failed to get login attempts from redis: %w", err)
 	}
+
+	ttl, err := u.rdb.TTL(ctx, loginKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return "", fmt.Errorf("failed to get TTL from redis: %w", err)
+	}
+
+	if ttl > 0 && attempts >= maxAttempts {
+		return "", &response.CooldownError{
+			Message:    "Too many login attempts, please try again later.",
+			RetryAfter: ttl,
+		}
+	}
+
 	admin, err := u.repo.FindByEmail(ctx, req.Email)
 	if err != nil {
+		u.rdb.Incr(ctx, loginKey)
+		u.rdb.Expire(ctx, loginKey, cooldownDuration)
 		return "", errors.New("email incorrect")
 	}
 
 	isPassword := utils.CheckPasswordHash(req.Password, admin.Password)
 	if !isPassword {
+		u.rdb.Incr(ctx, loginKey)
+		u.rdb.Expire(ctx, loginKey, cooldownDuration)
 		return "", errors.New("password incorrect")
 	}
 
@@ -88,6 +112,7 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 		return "", errors.New("failed to get token expiry")
 	}
 
+	// Menyimpan token ke Redis dengan waktu kedaluwarsa yang sama dengan token JWT
 	redisKey := fmt.Sprintf("admin_token:%s", admin.ID)
 	err = u.rdb.Set(ctx, redisKey, token, time.Until(expiry)).Err()
 	if err != nil {

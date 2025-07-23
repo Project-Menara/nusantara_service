@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/dto"
@@ -63,6 +65,13 @@ func (h *UserHandler) LoginAdmin(c echo.Context) error {
 
 	token, err := h.UserService.LoginAdmin(c.Request().Context(), req)
 	if err != nil {
+		var cooldownErr *response.CooldownError
+		if errors.As(err, &cooldownErr) {
+			return response.Error(c, http.StatusTooManyRequests, cooldownErr.Message, map[string]interface{}{
+				"retry_after_seconds": int(cooldownErr.RetryAfter.Seconds()),
+				"retry_after_human":   fmt.Sprintf("%.0f seconds", cooldownErr.RetryAfter.Seconds()),
+			})
+		}
 		return response.Error(c, http.StatusUnauthorized, err.Error(), "invalid login")
 	}
 
@@ -166,3 +175,5 @@ func (h *UserHandler) ChangePasswordSuperAdmin(c echo.Context) error {
 
 	return response.Success(c, http.StatusOK, "change password success", userUpdate)
 }
+
+//CUSTOMER

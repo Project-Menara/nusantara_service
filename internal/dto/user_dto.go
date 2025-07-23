@@ -1,5 +1,6 @@
 package dto
 
+//Super Admin
 type RegisterAdminRequest struct {
 	Name     string `json:"name"`
 	Username string `json:"username"`
@@ -17,4 +18,9 @@ type ChangePasswordRequest struct {
 	CurrentPassword      string `json:"current_password"`
 	NewPassword          string `json:"new_password"`
 	ConfirmationPassword string `json:"confirmation_password"`
+}
+
+//Customer
+type CheckPhoneRequest struct {
+	Phone string `json:"phone"`
 }
