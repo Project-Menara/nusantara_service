@@ -1,77 +1,127 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/dto"
 	"nusantara_service/internal/response"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 )
 
-type AuthHandler struct {
-	AuthService services.AuthService
+type UserHandler struct {
+	UserService services.UserService
 }
 
-func NewAuthHandler(service services.AuthService) *AuthHandler {
-	return &AuthHandler{AuthService: service}
+func NewAuthHandler(service services.UserService) *UserHandler {
+	return &UserHandler{UserService: service}
 }
 
-func (h *AuthHandler) RegisterUser(c echo.Context) error {
-	var req dto.RegisterRequest
+func (h *UserHandler) RegisterAdmin(c echo.Context) error {
+	var req dto.RegisterAdminRequest
 	if err := c.Bind(&req); err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid request", err.Error())
 	}
 
-	if err := h.AuthService.Register(c.Request().Context(), req); err != nil {
+	if strings.TrimSpace(req.Username) == "" {
+		return response.Error(c, http.StatusBadRequest, "name is required", nil)
+	}
+	if strings.TrimSpace(req.Email) == "" {
+		return response.Error(c, http.StatusBadRequest, "email is required", nil)
+	}
+	if strings.TrimSpace(req.Password) == "" {
+		return response.Error(c, http.StatusBadRequest, "password is required", nil)
+	}
+	if strings.TrimSpace(req.RoleID) == "" {
+		return response.Error(c, http.StatusBadRequest, "role is required", nil)
+	}
+
+	data, err := h.UserService.RegisterAdmin(c.Request().Context(), req)
+	if err != nil {
 		return response.Error(c, http.StatusInternalServerError, "internal server error", err.Error())
 	}
 
-	return response.Success(c, http.StatusCreated, "user registered", req)
+	return response.Success(c, http.StatusCreated, "admin registered", *data)
 }
 
-func (h *AuthHandler) LoginUser(c echo.Context) error {
-	var req dto.LoginRequest
+func (h *UserHandler) LoginAdmin(c echo.Context) error {
+	var req dto.LoginAdminRequest
 	if err := c.Bind(&req); err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid request", err.Error())
 	}
 
-	token, err := h.AuthService.Login(c.Request().Context(), req)
+	if strings.TrimSpace(req.Email) == "" {
+		return response.Error(c, http.StatusBadRequest, "email is required", nil)
+	}
+
+	if strings.TrimSpace(req.Password) == "" {
+		return response.Error(c, http.StatusBadRequest, "password is required", nil)
+	}
+
+	token, err := h.UserService.LoginAdmin(c.Request().Context(), req)
 	if err != nil {
 		return response.Error(c, http.StatusUnauthorized, "invalid login", err.Error())
 	}
 
-	return response.Success(c, http.StatusOK, "login successful", map[string]string{
-		"token": token,
-	})
+	return response.Success(c, http.StatusOK, "login success", token)
 }
 
-func (h *AuthHandler) GetProfile(c echo.Context) error {
-	userToken, ok := c.Get("user").(*jwt.Token)
-	if !ok || userToken == nil {
-		return response.Error(c, http.StatusUnauthorized, "Unauthorized", nil)
+func (h *UserHandler) GetProfileAdmin(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
 	}
 
-	claims := userToken.Claims.(jwt.MapClaims)
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
 	userID := claims["user_id"].(string)
 
-	return response.Success(c, http.StatusOK, "Get user successfully", map[string]string{
-		"user_id": userID,
-	})
+	authHeader := c.Request().Header.Get("Authorization")
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
+	profile, err := h.UserService.GetProfile(context.Background(), userID, token)
+	if err != nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Get Profile Success", profile)
 }
 
-func (h *AuthHandler) LogoutUser(c echo.Context) error {
-	userToken, ok := c.Get("user").(*jwt.Token)
-	if !ok || userToken == nil {
-		return response.Error(c, http.StatusUnauthorized, "Unauthorized", nil)
+func (h *UserHandler) LogoutAdmin(c echo.Context) error {
+	authHeader := c.Request().Header.Get("Authorization")
+	if authHeader == "" {
+		return response.Error(c, http.StatusUnauthorized, "Missing Authorization header", nil)
 	}
 
-	token := userToken.Raw
+	token := strings.TrimPrefix(authHeader, "Bearer ")
 
-	if err := h.AuthService.Logout(c.Request().Context(), token); err != nil {
-		return response.Error(c, http.StatusInternalServerError, "Internal server error", err.Error())
+	ctx := c.Request().Context() // Use request context here
+
+	// Check if token is already blacklisted
+	exists, err := h.UserService.CheckTokenBlacklisted(ctx, token)
+	if err != nil {
+		// Only return 500 if it's a true Redis error (not redis.Nil)
+		return response.Error(c, http.StatusInternalServerError, "internal server error", err.Error())
+	}
+	if exists {
+		return response.Error(c, http.StatusUnauthorized, "You are already logged out", nil)
 	}
 
-	return response.Success(c, http.StatusOK, "Logout successfully", nil)
+	// Blacklist the token
+	if token != "" {
+		if err := h.UserService.LogoutAdmin(ctx, token); err != nil { // Use request context
+			return response.Error(c, http.StatusInternalServerError, "internal server error", err.Error())
+		}
+	} else {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: Token is empty", nil) // More specific error
+	}
+
+	return response.Success(c, http.StatusOK, "Logout Success", nil)
 }

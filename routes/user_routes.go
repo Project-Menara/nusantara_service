@@ -13,11 +13,11 @@ import (
 
 func UserRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client) {
 	userRepo := repositories.NewUserRepositoryImpl(db)
-	authService := usecases.NewAuthUsecase(userRepo, rdb)
+	authService := usecases.NewUserUsecase(userRepo, rdb)
 	authHandler := handlers.NewAuthHandler(authService)
 
-	e.POST("/register", authHandler.RegisterUser)
-	e.POST("/login", authHandler.LoginUser)
-	e.POST("/logout", authHandler.LogoutUser, middlewares.JWTMiddleware(rdb))
-	e.GET("/me", authHandler.GetProfile, middlewares.JWTMiddleware(rdb))
+	e.POST("/admin/register", authHandler.RegisterAdmin)
+	e.POST("/admin/login", authHandler.LoginAdmin)
+	e.GET("/admin/me", authHandler.GetProfileAdmin, middlewares.JWTMiddleware(rdb))
+	e.POST("/admin/logout", authHandler.LogoutAdmin, middlewares.JWTMiddleware(rdb))
 }

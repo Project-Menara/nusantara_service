@@ -6,6 +6,8 @@ import (
 )
 
 type UserRepository interface {
-	Create(ctx context.Context, user *entities.UserEntity) error
+	CreateAdmin(ctx context.Context, user *entities.UserEntity) (*entities.UserEntity, error)
+	FindExistUsername(ctx context.Context, username string) (*entities.UserEntity, error)
 	FindByEmail(ctx context.Context, email string) (*entities.UserEntity, error)
+	FindUserById(ctx context.Context, userId string) (*entities.UserEntity, error)
 }

@@ -25,6 +25,7 @@ func JWTMiddleware(rdb *redis.Client) echo.MiddlewareFunc {
 				ctx := context.Background()
 				val, err := rdb.Get(ctx, fmt.Sprintf("blacklist:%s", token)).Result()
 				if err == nil && val == "blacklisted" {
+					// c.Error(echo.NewHTTPError(http.StatusUnauthorized, "token is blacklisted"))
 					return true
 				}
 			}
