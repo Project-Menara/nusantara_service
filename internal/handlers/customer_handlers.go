@@ -39,3 +39,21 @@ func (h *CustomerHandler) CheckPhoneCustomer(c echo.Context) error {
 		"action": "register",
 	})
 }
+
+func (h *CustomerHandler) RegisterCustomer(c echo.Context) error {
+	var req dto.RegisterCustomerRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request", err.Error())
+	}
+
+	data, err := h.CustomerService.RegisterCustomer(c.Request().Context(), req)
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, err.Error(), nil)
+	}
+
+	if data == nil {
+		return response.Error(c, http.StatusBadRequest, "Internal Server Error", nil)
+	}
+
+	return response.Success(c, http.StatusCreated, "customer registered", data)
+}

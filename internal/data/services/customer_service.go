@@ -8,4 +8,5 @@ import (
 
 type CustomerService interface {
 	CheckPhone(ctx context.Context, req dto.CheckPhoneRequest) (*entities.UserEntity, error)
+	RegisterCustomer(ctx context.Context, req dto.RegisterCustomerRequest) (*entities.UserEntity, error)
 }

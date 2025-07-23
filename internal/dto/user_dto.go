@@ -26,8 +26,9 @@ type CheckPhoneRequest struct {
 }
 
 type RegisterCustomerRequest struct {
-	Name   string `json:"name"`
-	Email  string `json:"email"`
-	Phone  string `json:"phone"`
-	Gender string `json:"gender"`
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Phone    string `json:"phone"`
+	Gender   string `json:"gender"`
 }

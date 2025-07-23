@@ -16,4 +16,5 @@ func CustomerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client) {
 	custHandler := handlers.NewCustomerHandler(custService)
 
 	e.POST("/check-phone", custHandler.CheckPhoneCustomer)
+	e.POST("/register", custHandler.RegisterCustomer)
 }
