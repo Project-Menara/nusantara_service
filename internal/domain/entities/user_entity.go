@@ -19,6 +19,7 @@ type UserEntity struct {
 	Photo       *string        `gorm:"type:varchar(100)" json:"photo"`
 	RoleID      uuid.UUID      `gorm:"type:uuid" json:"-"`
 	Role        RoleEntity     `gorm:"foreignKey:RoleID" json:"role"`
+	Status      int            `gorm:"type:int" json:"status"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `json:"deleted_at"`

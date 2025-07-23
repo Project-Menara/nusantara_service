@@ -51,6 +51,7 @@ func (u *userService) RegisterAdmin(ctx context.Context, req dto.RegisterAdminRe
 		Email:    req.Email,
 		Password: hashed,
 		RoleID:   uuid.MustParse(req.RoleID),
+		Status:   1,
 	}
 
 	createdUser, err := u.repo.CreateAdmin(ctx, newAdmin)

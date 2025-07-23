@@ -20,6 +20,7 @@ type User struct {
 
 	RoleID uuid.UUID `gorm:"type:uuid"`
 	Role   Role      `gorm:"foreignKey:RoleID"`
+	Status int       `gorm:"type:int;not null"`
 
 	CreatedAt time.Time      `gorm:"autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"autoUpdateTime"`
