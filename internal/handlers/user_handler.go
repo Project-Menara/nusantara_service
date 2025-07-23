@@ -72,6 +72,12 @@ func (h *UserHandler) LoginAdmin(c echo.Context) error {
 				"retry_after_human":   fmt.Sprintf("%.0f seconds", cooldownErr.RetryAfter.Seconds()),
 			})
 		}
+		var attemptErr *response.LoginAttemptError
+		if errors.As(err, &attemptErr) {
+			return response.Error(c, http.StatusUnauthorized, attemptErr.Message, map[string]interface{}{
+				"remaining_attempts": attemptErr.RemainingAttempts,
+			})
+		}
 		return response.Error(c, http.StatusUnauthorized, err.Error(), "invalid login")
 	}
 

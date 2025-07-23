@@ -91,14 +91,31 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 	if err != nil {
 		u.rdb.Incr(ctx, loginKey)
 		u.rdb.Expire(ctx, loginKey, cooldownDuration)
-		return "", errors.New("email incorrect")
+
+		remainingAttempts := maxAttempts - (attempts - 1)
+		if remainingAttempts < 0 {
+			remainingAttempts = 0
+		}
+
+		return "", &response.LoginAttemptError{
+			Message:           "email incorrect",
+			RemainingAttempts: remainingAttempts,
+		}
 	}
 
 	isPassword := utils.CheckPasswordHash(req.Password, admin.Password)
 	if !isPassword {
 		u.rdb.Incr(ctx, loginKey)
 		u.rdb.Expire(ctx, loginKey, cooldownDuration)
-		return "", errors.New("password incorrect")
+		remainingAttempts := maxAttempts - (attempts - 1)
+		if remainingAttempts < 0 {
+			remainingAttempts = 0
+		}
+
+		return "", &response.LoginAttemptError{
+			Message:           "password incorrect",
+			RemainingAttempts: remainingAttempts,
+		}
 	}
 
 	u.rdb.Del(ctx, loginKey)

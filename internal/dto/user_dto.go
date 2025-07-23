@@ -24,3 +24,10 @@ type ChangePasswordRequest struct {
 type CheckPhoneRequest struct {
 	Phone string `json:"phone"`
 }
+
+type RegisterCustomerRequest struct {
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Phone  string `json:"phone"`
+	Gender string `json:"gender"`
+}
