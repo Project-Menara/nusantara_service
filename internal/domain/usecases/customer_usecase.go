@@ -153,3 +153,39 @@ func (u *CustomerService) ResendCodeOTPVerify(ctx context.Context, req dto.Resen
 
 	return nil
 }
+
+// VerifyCodeOTP implements services.CustomerService.
+func (u *CustomerService) VerifyCodeOTP(ctx context.Context, req dto.VerifyOTPRequest) error {
+	if strings.TrimSpace(req.Phone) == "" || strings.TrimSpace(req.Code) == "" {
+		return response.NewCustomError(response.ErrBadRequest, "phone and code are required", 400)
+	}
+
+	normalizedPhone := utils.NormalizePhone(req.Phone)
+
+	user, err := u.repo.FindByPhoneCustomer(ctx, normalizedPhone)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "user not found", 404)
+		}
+		return response.NewCustomError(response.ErrInternal, "failed to check phone number", 500)
+	}
+
+	redisKey := fmt.Sprintf("otp:%s", normalizedPhone)
+	storedCode, err := configs.GetRedis(ctx, redisKey)
+	if err != nil {
+		return response.NewCustomError(response.ErrUnauthorized, "OTP expired or invalid", 401)
+	}
+
+	if storedCode != req.Code {
+		return response.NewCustomError(response.ErrUnauthorized, "invalid OTP code", 401)
+	}
+
+	_ = configs.DeleteRedis(ctx, redisKey)
+
+	err = u.repo.UpdateStatusCustomer(ctx, user.ID, 1)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to update user status", 500)
+	}
+
+	return nil
+}

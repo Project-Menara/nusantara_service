@@ -84,3 +84,10 @@ func (u *CustomerRepositoryImpl) CreateCustomer(ctx context.Context, user *entit
 
 	return user, nil
 }
+
+// UpdateStatusCustomer implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) UpdateStatusCustomer(ctx context.Context, userID string, status int) error {
+	return u.db.WithContext(ctx).Model(&entities.UserEntity{}).
+		Where("id = ?", userID).
+		Update("status", status).Error
+}

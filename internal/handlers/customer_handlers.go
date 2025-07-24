@@ -82,5 +82,21 @@ func (h *CustomerHandler) ResendCodeOTPVerify(c echo.Context) error {
 		"phone":   req.Phone,
 		"message": "OTP code sent successfully",
 	})
+}
 
+func (h *CustomerHandler) VerifyCodeOTP(c echo.Context) error {
+	var req dto.VerifyOTPRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request", err.Error())
+	}
+
+	err := h.CustomerService.VerifyCodeOTP(c.Request().Context(), req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "OTP verification success", nil)
 }
