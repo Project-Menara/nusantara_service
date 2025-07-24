@@ -22,5 +22,9 @@ func NormalizePhone(phone string) string {
 	if strings.HasPrefix(phone, "62") {
 		return "+" + phone
 	}
-	return phone // diasumsikan sudah +62
+	return phone
+}
+func IsPhoneDigitsOnly(phone string) bool {
+	phone = strings.TrimPrefix(phone, "+")
+	return IsDigitsOnly(phone)
 }

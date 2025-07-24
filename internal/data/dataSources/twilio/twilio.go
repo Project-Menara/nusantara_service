@@ -5,14 +5,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 )
 
 func SendWhatsAppOTP(to string, otp string) error {
-	from := os.Getenv("TWILIO_PHONE_NUMBER")
-	sid := os.Getenv("TWILIO_ACCOUNT_SID")
-	token := os.Getenv("TWILIO_AUTH_TOKEN")
+	from := "+14155238886"
+	sid := "AC75ae06a57ea07621e56d02c2f074e3b9"
+	token := "792d46515d5f6ad2906ed51d932f3db3"
 
 	// Prepare the message
 	msg := fmt.Sprintf("Kode OTP kamu adalah: %s\nHanya Berlaku Selama 1 menit", otp)

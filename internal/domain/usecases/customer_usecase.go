@@ -37,12 +37,13 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 	}
 
 	normalized := utils.NormalizePhone(phone)
+	digitsOnly := strings.TrimPrefix(normalized, "+")
 
-	if len(normalized) < 12 || len(normalized) > 13 {
-		return nil, response.NewCustomError(response.ErrBadRequest, "phone number must be 12 or 13 digits", 400)
+	if len(digitsOnly) < 11 || len(digitsOnly) > 13 {
+		return nil, response.NewCustomError(response.ErrBadRequest, "phone number must be 11 to 13 digits", 400)
 	}
 
-	if !utils.IsDigitsOnly(normalized) {
+	if !utils.IsPhoneDigitsOnly(normalized) {
 		return nil, response.NewCustomError(response.ErrBadRequest, "phone number must contain only digits", 400)
 	}
 
