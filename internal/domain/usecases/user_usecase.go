@@ -36,7 +36,7 @@ func (u *userService) RegisterAdmin(ctx context.Context, req dto.RegisterAdminRe
 	}
 
 	if existingUsername != nil {
-		return nil, errors.New("username already exists")
+		return nil, response.NewCustomError(response.ErrExists, "username already exists", 409)
 	}
 
 	hashed, err := utils.HashPassword(req.Password)
@@ -56,7 +56,7 @@ func (u *userService) RegisterAdmin(ctx context.Context, req dto.RegisterAdminRe
 
 	createdUser, err := u.repo.CreateAdmin(ctx, newAdmin)
 	if err != nil {
-		return nil, errors.New("failed to create admin")
+		return nil, response.NewCustomError(response.ErrInternal, "failed to create admin", 500)
 	}
 
 	return createdUser, nil
@@ -155,19 +155,19 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 
 	token, err := utils.GenerateToken(admin.ID)
 	if err != nil {
-		return "", errors.New("failed to generate token")
+		return "", response.NewCustomError(response.ErrInternal, "failed to generate token", 500)
 	}
 
 	expiry, err := utils.GetExpiryFromToken(token)
 	if err != nil {
-		return "", errors.New("failed to get token expiry")
+		return "", response.NewCustomError(response.ErrInternal, "failed to get token expiry", 500)
 	}
 
 	// Menyimpan token ke Redis dengan waktu kedaluwarsa yang sama dengan token JWT
 	redisKey := fmt.Sprintf("admin_token:%s", admin.ID)
 	err = u.rdb.Set(ctx, redisKey, token, time.Until(expiry)).Err()
 	if err != nil {
-		return "", errors.New("failed to store token in redis")
+		return "", response.NewCustomError(response.ErrInternal, "failed to store token in redis", 500)
 	}
 
 	return token, nil
@@ -214,19 +214,19 @@ func (u *userService) ChangePasswordSuperAdmin(ctx context.Context, userId strin
 	user, err := u.repo.FindUserById(ctx, userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("user not found")
+			return nil, response.NewCustomError(response.ErrNotFound, "user not found", 404)
 		}
 		return nil, err
 	}
 
 	if !utils.CheckPasswordHash(req.CurrentPassword, user.Password) {
-		return nil, errors.New("invalid current password")
+		return nil, response.NewCustomError(response.ErrBadRequest, "invalid current password", 400)
 	}
 	if req.NewPassword != req.ConfirmationPassword {
-		return nil, errors.New("new password and confirmation do not match")
+		return nil, response.NewCustomError(response.ErrBadRequest, "new password and confirmation do not match", 400)
 	}
 	if len(req.NewPassword) < 6 {
-		return nil, errors.New("new password must be at least 6 characters long")
+		return nil, response.NewCustomError(response.ErrBadRequest, "new password must be at least 6 characters long", 400)
 	}
 
 	hashedNewPassword, err := utils.HashPassword(req.NewPassword)

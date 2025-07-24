@@ -25,7 +25,10 @@ func (h *CustomerHandler) CheckPhoneCustomer(c echo.Context) error {
 
 	user, err := h.CustomerService.CheckPhone(c.Request().Context(), req)
 	if err != nil {
-		return response.Error(c, http.StatusBadRequest, err.Error(), nil)
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
 	}
 
 	if user != nil {
@@ -48,7 +51,10 @@ func (h *CustomerHandler) RegisterCustomer(c echo.Context) error {
 
 	data, err := h.CustomerService.RegisterCustomer(c.Request().Context(), req)
 	if err != nil {
-		return response.Error(c, http.StatusBadRequest, err.Error(), nil)
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
 	}
 
 	if data == nil {

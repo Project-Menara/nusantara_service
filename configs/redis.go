@@ -4,14 +4,16 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 var Ctx = context.Background()
+var rdb *redis.Client
 
 func InitRedis() *redis.Client {
-	rdb := redis.NewClient(&redis.Options{
+	rdb = redis.NewClient(&redis.Options{
 		Addr:     os.Getenv("REDIS_ADDR"),
 		Username: "default",
 		Password: os.Getenv("REDIS_PASSWORD"),
@@ -23,4 +25,18 @@ func InitRedis() *redis.Client {
 	}
 	log.Println("Redis Connected!")
 	return rdb
+}
+
+func SetRedis(ctx context.Context, key, value string, duration time.Duration) error {
+	return rdb.Set(ctx, key, value, duration).Err()
+}
+
+// Get value berdasarkan key
+func GetRedis(ctx context.Context, key string) (string, error) {
+	return rdb.Get(ctx, key).Result()
+}
+
+// Delete key dari Redis
+func DeleteRedis(ctx context.Context, key string) error {
+	return rdb.Del(ctx, key).Err()
 }

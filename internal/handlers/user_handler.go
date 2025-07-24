@@ -176,7 +176,10 @@ func (h *UserHandler) ChangePasswordSuperAdmin(c echo.Context) error {
 
 	userUpdate, err := h.UserService.ChangePasswordSuperAdmin(c.Request().Context(), userID, token, req)
 	if err != nil {
-		return response.Error(c, http.StatusInternalServerError, err.Error(), nil)
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, "something went wrong", err.Error())
 	}
 
 	return response.Success(c, http.StatusOK, "change password success", userUpdate)
