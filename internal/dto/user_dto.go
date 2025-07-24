@@ -32,3 +32,7 @@ type RegisterCustomerRequest struct {
 	Phone    string `json:"phone"`
 	Gender   string `json:"gender"`
 }
+
+type ResendOTPRequest struct {
+	Phone string `json:"phone"`
+}

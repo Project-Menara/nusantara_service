@@ -113,7 +113,7 @@ func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.Register
 	otpCode := otp.GenerateOTP(6)
 	redisKey := fmt.Sprintf("otp:%s", normalizedPhone)
 
-	err = configs.SetRedis(ctx, redisKey, otpCode, time.Minute)
+	err = configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
 	if err != nil {
 		return nil, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
 	}
@@ -124,4 +124,25 @@ func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.Register
 	}
 
 	return createdCustomer, nil
+}
+
+func (u *CustomerService) ResendCodeOTPVerify(ctx context.Context, req dto.ResendOTPRequest) error {
+	if strings.TrimSpace(req.Phone) == "" {
+		return response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
+	}
+	normalizedPhone := utils.NormalizePhone(req.Phone)
+
+	redisKey := fmt.Sprintf("otp:%s", normalizedPhone)
+	otpCode := otp.GenerateOTP(6)
+	err := configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+	}
+
+	err = twilio.SendWhatsAppOTP(normalizedPhone, otpCode)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+	}
+
+	return nil
 }

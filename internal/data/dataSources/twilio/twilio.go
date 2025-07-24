@@ -15,7 +15,7 @@ func SendWhatsAppOTP(to string, otp string) error {
 	token := os.Getenv("TWILIO_AUTH_TOKEN")
 
 	// Prepare the message
-	msg := fmt.Sprintf("Kode OTP kamu adalah: %s", otp)
+	msg := fmt.Sprintf("Kode OTP kamu adalah: %s\nHanya Berlaku Selama 1 menit", otp)
 	msgData := url.Values{}
 	msgData.Set("To", "whatsapp:"+to)
 	msgData.Set("From", "whatsapp:"+from)

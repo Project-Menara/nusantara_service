@@ -17,4 +17,5 @@ func CustomerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client) {
 
 	e.POST("/check-phone", custHandler.CheckPhoneCustomer)
 	e.POST("/register", custHandler.RegisterCustomer)
+	e.POST("/resend-code-verify", custHandler.ResendCodeOTPVerify)
 }
