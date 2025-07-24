@@ -131,17 +131,23 @@ func (u *CustomerService) ResendCodeOTPVerify(ctx context.Context, req dto.Resen
 	if strings.TrimSpace(req.Phone) == "" {
 		return response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
 	}
-	normalizedPhone := utils.NormalizePhone(req.Phone)
 
-	redisKey := fmt.Sprintf("otp:%s", normalizedPhone)
-	otpCode := otp.GenerateOTP(6)
-	err := configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
+	normalizedPhone := utils.NormalizePhone(req.Phone)
+	user, err := u.repo.FindByPhoneCustomer(ctx, normalizedPhone)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return response.NewCustomError(response.ErrNotFound, "phone number not registered", 404)
+	}
 	if err != nil {
-		return response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+		return response.NewCustomError(response.ErrInternal, "failed to check phone number", 500)
 	}
 
-	err = twilio.SendWhatsAppOTP(normalizedPhone, otpCode)
-	if err != nil {
+	redisKey := fmt.Sprintf("otp:%s", *user.Phone)
+	otpCode := otp.GenerateOTP(6)
+	if err := configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1); err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to store OTP", 500)
+	}
+
+	if err := twilio.SendWhatsAppOTP(*user.Phone, otpCode); err != nil {
 		return response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
 	}
 

@@ -78,5 +78,9 @@ func (h *CustomerHandler) ResendCodeOTPVerify(c echo.Context) error {
 		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
 	}
 
-	return response.Success(c, http.StatusCreated, "resend code success", req.Phone)
+	return response.Success(c, http.StatusCreated, "resend code success", map[string]string{
+		"phone":   req.Phone,
+		"message": "OTP code sent successfully",
+	})
+
 }
