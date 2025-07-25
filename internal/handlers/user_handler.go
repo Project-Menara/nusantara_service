@@ -110,6 +110,24 @@ func (h *UserHandler) GetProfileAdmin(c echo.Context) error {
 }
 
 func (h *UserHandler) LogoutAdmin(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	role := claims["role"]
+	if role != "superadmin" {
+		return response.Error(c, http.StatusUnauthorized, "Invalid role access", nil)
+	}
+
+	userID := claims["user_id"].(string)
+
 	authHeader := c.Request().Header.Get("Authorization")
 	if authHeader == "" {
 		return response.Error(c, http.StatusUnauthorized, "Missing Authorization header", nil)
@@ -131,7 +149,7 @@ func (h *UserHandler) LogoutAdmin(c echo.Context) error {
 
 	// Blacklist the token
 	if token != "" {
-		if err := h.UserService.LogoutAdmin(ctx, token); err != nil { // Use request context
+		if err := h.UserService.LogoutAdmin(ctx, userID, token); err != nil { // Use request context
 			return response.Error(c, http.StatusInternalServerError, err.Error(), "internal server error")
 		}
 	} else {

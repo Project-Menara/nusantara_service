@@ -61,6 +61,18 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 	}
 
 	if user.Status == 0 {
+		otpCode := otp.GenerateOTP(6)
+		redisKey := fmt.Sprintf("otp:%s", normalized)
+
+		err = configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
+		if err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
+		}
+
+		err = twilio.SendWhatsAppOTP(normalized, otpCode)
+		if err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+		}
 		// Belum verifikasi OTP
 		return &response.CheckPhoneResult{
 			Action: "verify_otp",
@@ -69,6 +81,18 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 	}
 
 	if user.Status == 1 && user.Password == "" {
+		otpCode := otp.GenerateOTP(6)
+		redisKey := fmt.Sprintf("otp:%s", normalized)
+
+		err = configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
+		if err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
+		}
+
+		err = twilio.SendWhatsAppOTP(normalized, otpCode)
+		if err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+		}
 		return &response.CheckPhoneResult{
 			Action: "verify_otp_and_create_pin",
 			User:   user,
@@ -217,13 +241,118 @@ func (u *CustomerService) VerifyCodeOTP(ctx context.Context, req dto.VerifyOTPRe
 	return nil
 }
 
-// ConfirmPinCustomer implements services.CustomerService.
-func (u *CustomerService) ConfirmPinCustomer(ctx context.Context, req dto.ConfirmPinRequest) error {
-	panic("unimplemented")
-}
-
 // NewPinCustomer implements services.CustomerService.
 func (u *CustomerService) NewPinCustomer(ctx context.Context, req dto.NewPinRequest) error {
-	panic("unimplemented")
+	if strings.TrimSpace(req.PIN) == "" || strings.TrimSpace(req.Phone) == "" {
+		return response.NewCustomError(response.ErrBadRequest, "phone and pin required", 400)
+	}
+
+	normalizedPhone := utils.NormalizePhone(req.Phone)
+	redisKey := fmt.Sprintf("newpin:%s", normalizedPhone)
+
+	err := configs.SetRedis(ctx, redisKey, req.PIN, 15*time.Minute)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to save pin temporarily", 500)
+	}
+
+	return nil
+}
+
+// ConfirmPinCustomer implements services.CustomerService.
+func (u *CustomerService) ConfirmPinCustomer(ctx context.Context, req dto.ConfirmPinRequest) (*entities.UserEntity, string, error) {
+	normalizedPhone := utils.NormalizePhone(req.Phone)
+	redisKey := fmt.Sprintf("newpin:%s", normalizedPhone)
+
+	storedPIN, err := configs.GetRedis(ctx, redisKey)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrUnauthorized, "PIN expired or not set", 401)
+	}
+
+	if storedPIN != req.ConfirmPIN {
+		return nil, "", response.NewCustomError(response.ErrUnauthorized, "PIN does not match", 401)
+	}
+
+	user, err := u.repo.FindByPhoneCustomer(ctx, normalizedPhone)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, "", response.NewCustomError(response.ErrNotFound, "user not found", 404)
+		}
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to get user", 500)
+	}
+
+	hashedPin, err := utils.HashPassword(req.ConfirmPIN)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to hash pin", 500)
+	}
+
+	err = u.repo.UpdatePinCustomer(ctx, user.ID, hashedPin)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to save pin", 500)
+	}
+
+	_ = configs.DeleteRedis(ctx, redisKey)
+
+	token, err := utils.GenerateToken(user.ID, user.Role.Name)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to generate token", 500)
+	}
+
+	redisTokenKey := fmt.Sprintf("customer_token:%s", user.ID)
+	err = configs.SetRedis(ctx, redisTokenKey, token, 30*time.Minute)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to store session", 500)
+	}
+
+	return user, token, nil
+}
+
+// GetProfileCustomer implements services.CustomerService.
+func (u *CustomerService) GetProfileCustomer(ctx context.Context, userId string, token string) (*entities.UserEntity, error) {
+	redis_key := fmt.Sprintf("customer_token:%s", userId)
+	storedToken, err := u.rdb.Get(ctx, redis_key).Result()
+	if err != nil || storedToken != token {
+		return nil, response.NewCustomError(response.ErrNotFound, "token not found", 404)
+	}
+
+	customer, err := u.repo.FindByUseIDCustomer(ctx, userId)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrNotFound, "user not found", 404)
+	}
+
+	return customer, nil
+}
+
+// LogoutCustomer implements services.CustomerService.
+func (u *CustomerService) LogoutCustomer(ctx context.Context, userId, token string) error {
+	expiry, err := utils.GetExpiryFromToken(token)
+	if err != nil {
+		return response.NewCustomError(response.ErrNotFound, "token expired not found", 404)
+	}
+
+	blackListKey := fmt.Sprintf("blacklist_customer:%s", token)
+	err = u.rdb.Set(ctx, blackListKey, "blacklisted", time.Until(expiry)).Err()
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to blacklist token", 500)
+	}
+
+	redisKey := fmt.Sprintf("customer_token:%s", userId)
+	err = u.rdb.Del(ctx, redisKey).Err()
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to delete session token", 500)
+	}
+
+	return nil
+
+}
+
+func (u *CustomerService) CheckTokenBlacklisted(ctx context.Context, token string) (bool, error) {
+	val, err := u.rdb.Get(ctx, fmt.Sprintf("blacklist_customer:%s", token)).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return false, nil // Key does not exist, so not blacklisted
+		}
+		return false, err // Other actual Redis error
+	}
+	return val == "blacklisted", nil // Key exists, check its value
 
 }

@@ -48,7 +48,7 @@ func (u *UserRepositoryImpl) FindExistUsername(ctx context.Context, username str
 // FindByEmail implements repositories.UserRepository.
 func (u *UserRepositoryImpl) FindByEmail(ctx context.Context, email string) (*entities.UserEntity, error) {
 	var user entities.UserEntity
-	if err := u.db.WithContext(ctx).First(&user, "email = ?", email).Error; err != nil {
+	if err := u.db.WithContext(ctx).Preload("Role").First(&user, "email = ?", email).Error; err != nil {
 		return nil, err
 	}
 

@@ -153,7 +153,7 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 
 	u.rdb.Del(ctx, loginKey)
 
-	token, err := utils.GenerateToken(admin.ID)
+	token, err := utils.GenerateToken(admin.ID, admin.Role.Name)
 	if err != nil {
 		return "", response.NewCustomError(response.ErrInternal, "failed to generate token", 500)
 	}
@@ -164,7 +164,7 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 	}
 
 	// Menyimpan token ke Redis dengan waktu kedaluwarsa yang sama dengan token JWT
-	redisKey := fmt.Sprintf("admin_token:%s", admin.ID)
+	redisKey := fmt.Sprintf("superadmin_token:%s", admin.ID)
 	err = u.rdb.Set(ctx, redisKey, token, time.Until(expiry)).Err()
 	if err != nil {
 		return "", response.NewCustomError(response.ErrInternal, "failed to store token in redis", 500)
@@ -174,7 +174,7 @@ func (u *userService) LoginAdmin(ctx context.Context, req dto.LoginAdminRequest)
 }
 
 func (u *userService) GetProfile(ctx context.Context, userId string, token string) (*entities.UserEntity, error) {
-	redis_key := fmt.Sprintf("admin_token:%s", userId)
+	redis_key := fmt.Sprintf("superadmin_token:%s", userId)
 	storedToken, err := u.rdb.Get(ctx, redis_key).Result()
 	if err != nil || storedToken != token {
 		return nil, errors.New("invalid or expired session")
@@ -188,16 +188,22 @@ func (u *userService) GetProfile(ctx context.Context, userId string, token strin
 	return admin, nil
 }
 
-func (u *userService) LogoutAdmin(ctx context.Context, token string) error {
+func (u *userService) LogoutAdmin(ctx context.Context, userId, token string) error {
 	expiry, err := utils.GetExpiryFromToken(token)
 	if err != nil {
 		return err
 	}
 
-	blackListKey := fmt.Sprintf("blacklist:%s", token)
+	blackListKey := fmt.Sprintf("blacklist_superadmin:%s", token)
 	err = u.rdb.Set(ctx, blackListKey, "blacklisted", time.Until(expiry)).Err()
 	if err != nil {
 		return errors.New("failed to blacklist token")
+	}
+
+	redisKey := fmt.Sprintf("superadmin_token:%s", userId)
+	err = u.rdb.Del(ctx, redisKey).Err()
+	if err != nil {
+		return errors.New("failed to delete session token")
 	}
 
 	return nil
@@ -205,7 +211,7 @@ func (u *userService) LogoutAdmin(ctx context.Context, token string) error {
 
 // ChangePasswordSuperAdmin implements services.UserService.
 func (u *userService) ChangePasswordSuperAdmin(ctx context.Context, userId string, token string, req dto.ChangePasswordRequest) (*entities.UserEntity, error) {
-	redis_key := fmt.Sprintf("admin_token:%s", userId)
+	redis_key := fmt.Sprintf("superadmin_token:%s", userId)
 	storedToken, err := u.rdb.Get(ctx, redis_key).Result()
 	if err != nil || storedToken != token {
 		return nil, errors.New("invalid or expired session")
@@ -247,7 +253,7 @@ func (u *userService) ChangePasswordSuperAdmin(ctx context.Context, userId strin
 
 // CheckTokenBlacklisted implements services.UserService.
 func (u *userService) CheckTokenBlacklisted(ctx context.Context, token string) (bool, error) {
-	val, err := u.rdb.Get(ctx, fmt.Sprintf("blacklist:%s", token)).Result()
+	val, err := u.rdb.Get(ctx, fmt.Sprintf("blacklist_superadmin:%s", token)).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return false, nil // Key does not exist, so not blacklisted

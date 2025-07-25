@@ -94,7 +94,22 @@ func (u *CustomerRepositoryImpl) UpdateStatusCustomer(ctx context.Context, userI
 
 // UpdatePinCustomer implements repositories.CustomerRepository.
 func (u *CustomerRepositoryImpl) UpdatePinCustomer(ctx context.Context, userID string, pin string) error {
-	return u.db.WithContext(ctx).Model(&entities.UserEntity{}).
-		Where("id = ?", userID).
-		Update("password", pin).Error
+	if err := u.db.WithContext(ctx).Model(&entities.UserEntity{}).Where("id = ?", userID).Update("password", pin).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
+// FindByUseIDCustomer implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) FindByUseIDCustomer(ctx context.Context, userID string) (*entities.UserEntity, error) {
+	var user entities.UserEntity
+	if err := u.db.WithContext(ctx).
+		Joins("LEFT JOIN roles ON roles.id = users.role_id").
+		Where("users.id = ? AND roles.name = ?", userID, "customer").
+		Preload("Role").
+		First(&user).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
 }
