@@ -24,4 +24,5 @@ func CustomerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client) {
 	e.POST("/confirm-pin", custHandler.ConfirmationPin)
 	e.GET("/me", custHandler.GetProfileCustomer, middlewares.JWTMiddleware(rdb))
 	e.POST("/logout", custHandler.LogoutCustomer, middlewares.JWTMiddleware(rdb))
+	e.POST("/login", custHandler.LoginCustomer)
 }

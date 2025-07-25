@@ -345,6 +345,120 @@ func (u *CustomerService) LogoutCustomer(ctx context.Context, userId, token stri
 
 }
 
+// LoginCustomer implements services.CustomerService.
+func (u *CustomerService) LoginCustomer(ctx context.Context, req dto.LoginCustomerRequest) (string, error) {
+	if strings.TrimSpace(req.Phone) == "" {
+		return "", response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
+	}
+	if strings.TrimSpace(req.Pin) == "" {
+		return "", response.NewCustomError(response.ErrBadRequest, "pin is required", 400)
+	}
+	loginKey := fmt.Sprintf("login_attempts_customer:%s", req.Phone)
+
+	const maxAttempts = 5
+	const cooldownDuration = 1 * time.Minute
+
+	attempts, err := u.rdb.Get(ctx, loginKey).Int()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return "", response.NewCustomError(response.ErrInternal, "failed to get login attempts from redis", 500)
+	}
+
+	ttl, err := u.rdb.TTL(ctx, loginKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return "", response.NewCustomError(response.ErrInternal, "failed to get TTL from redis", 500)
+	}
+
+	if attempts >= maxAttempts {
+		if ttl > 0 {
+			return "", &response.CooldownError{
+				Message:    "Too many login attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+	}
+
+	normalizedPhone := utils.NormalizePhone(req.Phone)
+
+	customer, err := u.repo.FindByPhoneCustomer(ctx, normalizedPhone)
+	if err != nil {
+		currentAttempts, err := u.rdb.Incr(ctx, loginKey).Result()
+		if err != nil {
+			return "", response.NewCustomError(response.ErrInternal, "failed to increment login attempts", 500)
+		}
+		u.rdb.Expire(ctx, loginKey, cooldownDuration)
+		if int(currentAttempts) >= maxAttempts {
+			ttl, _ := u.rdb.TTL(ctx, loginKey).Result()
+			if ttl <= 0 {
+				ttl = cooldownDuration
+			}
+			return "", &response.CooldownError{
+				Message:    "Too many login attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+
+		remainingAttempts := maxAttempts - int(currentAttempts)
+		if remainingAttempts < 0 {
+			remainingAttempts = 0
+		}
+
+		return "", &response.LoginAttemptError{
+			Message:           "phone incorrect",
+			RemainingAttempts: remainingAttempts,
+		}
+	}
+
+	isPin := utils.CheckPasswordHash(req.Pin, customer.Password)
+	if !isPin {
+		currentAttempts, err := u.rdb.Incr(ctx, loginKey).Result()
+		if err != nil {
+			return "", fmt.Errorf("failed to increment login attempts: %w", err)
+		}
+		u.rdb.Expire(ctx, loginKey, cooldownDuration)
+
+		if int(currentAttempts) >= maxAttempts {
+			ttl, _ := u.rdb.TTL(ctx, loginKey).Result()
+			if ttl <= 0 {
+				ttl = cooldownDuration
+			}
+			return "", &response.CooldownError{
+				Message:    "Too many login attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+
+		remainingAttempts := maxAttempts - int(currentAttempts)
+		if remainingAttempts < 0 {
+			remainingAttempts = 0
+		}
+
+		return "", &response.LoginAttemptError{
+			Message:           "pin incorrect",
+			RemainingAttempts: remainingAttempts,
+		}
+	}
+
+	u.rdb.Del(ctx, loginKey)
+
+	token, err := utils.GenerateToken(customer.ID, customer.Role.Name)
+	if err != nil {
+		return "", response.NewCustomError(response.ErrInternal, "failed to generate token", 500)
+	}
+
+	expiry, err := utils.GetExpiryFromToken(token)
+	if err != nil {
+		return "", response.NewCustomError(response.ErrInternal, "failed to get token expiry", 500)
+	}
+
+	redisKey := fmt.Sprintf("customer_token:%s", customer.ID)
+	err = u.rdb.Set(ctx, redisKey, token, time.Until(expiry)).Err()
+	if err != nil {
+		return "", response.NewCustomError(response.ErrInternal, "failed to store token in redis", 500)
+	}
+
+	return token, nil
+}
+
 func (u *CustomerService) CheckTokenBlacklisted(ctx context.Context, token string) (bool, error) {
 	val, err := u.rdb.Get(ctx, fmt.Sprintf("blacklist_customer:%s", token)).Result()
 	if err != nil {

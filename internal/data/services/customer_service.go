@@ -17,4 +17,5 @@ type CustomerService interface {
 	GetProfileCustomer(ctx context.Context, userId string, token string) (*entities.UserEntity, error)
 	CheckTokenBlacklisted(ctx context.Context, token string) (bool, error)
 	LogoutCustomer(ctx context.Context, userId, token string) error
+	LoginCustomer(ctx context.Context, req dto.LoginCustomerRequest) (string, error)
 }

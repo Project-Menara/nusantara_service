@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/dto"
@@ -213,4 +215,35 @@ func (h *CustomerHandler) LogoutCustomer(c echo.Context) error {
 	}
 
 	return response.Success(c, http.StatusOK, "Logout Success", nil)
+}
+
+func (h *CustomerHandler) LoginCustomer(c echo.Context) error {
+	var req dto.LoginCustomerRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request", err.Error())
+	}
+
+	token, err := h.CustomerService.LoginCustomer(c.Request().Context(), req)
+	if err != nil {
+		var cooldownErr *response.CooldownError
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		if errors.As(err, &cooldownErr) {
+			return response.Error(c, http.StatusTooManyRequests, cooldownErr.Message, map[string]interface{}{
+				"retry_after_seconds": int(cooldownErr.RetryAfter.Seconds()),
+				"retry_after_human":   fmt.Sprintf("%.0f seconds", cooldownErr.RetryAfter.Seconds()),
+			})
+		}
+
+		var attemptErr *response.LoginAttemptError
+		if errors.As(err, &attemptErr) {
+			return response.Error(c, http.StatusUnauthorized, attemptErr.Message, map[string]interface{}{
+				"remaining_attempts": fmt.Sprintf("%s. Sisa %d percobaan lagi.", attemptErr.Message, attemptErr.RemainingAttempts),
+			})
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "login success", token)
 }
