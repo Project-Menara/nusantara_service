@@ -23,23 +23,17 @@ func (h *CustomerHandler) CheckPhoneCustomer(c echo.Context) error {
 		return response.Error(c, http.StatusBadRequest, "invalid request", err.Error())
 	}
 
-	user, err := h.CustomerService.CheckPhone(c.Request().Context(), req)
+	result, err := h.CustomerService.CheckPhone(c.Request().Context(), req)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+		return response.Error(c, http.StatusInternalServerError, "something went wrong", err.Error())
 	}
 
-	if user != nil {
-		return response.Success(c, http.StatusOK, "Phone Number Registered", map[string]interface{}{
-			"action": "login",
-			"user":   user,
-		})
-	}
-
-	return response.Success(c, http.StatusOK, "Phone number not registered", map[string]interface{}{
-		"action": "register",
+	return response.Success(c, http.StatusOK, "Phone check result", map[string]interface{}{
+		"action": result.Action,
+		"user":   result.User,
 	})
 }
 

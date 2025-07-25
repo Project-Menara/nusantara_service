@@ -30,7 +30,7 @@ func NewCustomerUsecase(repo repositories.CustomerRepository, rdb *redis.Client)
 	return &CustomerService{repo: repo, rdb: rdb}
 }
 
-func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequest) (*entities.UserEntity, error) {
+func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequest) (*response.CheckPhoneResult, error) {
 	phone := strings.TrimSpace(req.Phone)
 	if phone == "" {
 		return nil, response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
@@ -47,12 +47,39 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 		return nil, response.NewCustomError(response.ErrBadRequest, "phone number must contain only digits", 400)
 	}
 
-	existingPhone, err := u.repo.FindByPhoneCustomer(ctx, normalized)
+	user, err := u.repo.FindByPhoneCustomer(ctx, normalized)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, response.NewCustomError(response.ErrInternal, "failed to check phone number", 500)
 	}
 
-	return existingPhone, nil
+	if user == nil {
+		// Not registered
+		return &response.CheckPhoneResult{
+			Action: "register",
+			User:   nil,
+		}, nil
+	}
+
+	if user.Status == 0 {
+		// Belum verifikasi OTP
+		return &response.CheckPhoneResult{
+			Action: "verify_otp",
+			User:   user,
+		}, nil
+	}
+
+	if user.Status == 1 && user.Password == "" {
+		return &response.CheckPhoneResult{
+			Action: "verify_otp_and_create_pin",
+			User:   user,
+		}, nil
+	}
+
+	// Siap login
+	return &response.CheckPhoneResult{
+		Action: "login",
+		User:   user,
+	}, nil
 }
 
 func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.RegisterCustomerRequest) (*entities.UserEntity, error) {
@@ -188,4 +215,15 @@ func (u *CustomerService) VerifyCodeOTP(ctx context.Context, req dto.VerifyOTPRe
 	}
 
 	return nil
+}
+
+// ConfirmPinCustomer implements services.CustomerService.
+func (u *CustomerService) ConfirmPinCustomer(ctx context.Context, req dto.ConfirmPinRequest) error {
+	panic("unimplemented")
+}
+
+// NewPinCustomer implements services.CustomerService.
+func (u *CustomerService) NewPinCustomer(ctx context.Context, req dto.NewPinRequest) error {
+	panic("unimplemented")
+
 }

@@ -91,3 +91,10 @@ func (u *CustomerRepositoryImpl) UpdateStatusCustomer(ctx context.Context, userI
 		Where("id = ?", userID).
 		Update("status", status).Error
 }
+
+// UpdatePinCustomer implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) UpdatePinCustomer(ctx context.Context, userID string, pin string) error {
+	return u.db.WithContext(ctx).Model(&entities.UserEntity{}).
+		Where("id = ?", userID).
+		Update("password", pin).Error
+}

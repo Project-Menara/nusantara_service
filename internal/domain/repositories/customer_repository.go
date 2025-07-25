@@ -13,4 +13,5 @@ type CustomerRepository interface {
 	FindRoleByName(ctx context.Context, role string) (*entities.RoleEntity, error)
 	CreateCustomer(ctx context.Context, user *entities.UserEntity) (*entities.UserEntity, error)
 	UpdateStatusCustomer(ctx context.Context, userID string, status int) error
+	UpdatePinCustomer(ctx context.Context, userID string, pin string) error
 }
