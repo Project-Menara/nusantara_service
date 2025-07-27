@@ -19,3 +19,12 @@ type LoginAttemptError struct {
 func (e *LoginAttemptError) Error() string {
 	return e.Message
 }
+
+type VerifyPINAttemptError struct {
+	Message           string
+	RemainingAttempts int
+}
+
+func (e *VerifyPINAttemptError) Error() string {
+	return e.Message
+}

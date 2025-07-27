@@ -15,4 +15,8 @@ type CustomerRepository interface {
 	UpdateStatusCustomer(ctx context.Context, userID string, status int) error
 	UpdatePinCustomer(ctx context.Context, userID string, pin string) error
 	FindByUseIDCustomer(ctx context.Context, userID string) (*entities.UserEntity, error)
+	UpdateCustomer(ctx context.Context, userId string, data *entities.UserEntity) (*entities.UserEntity, error)
+
+	//Change Phone
+	ChangePhoneCustomer(ctx context.Context, userId string, data *entities.UserEntity) (*entities.UserEntity, error)
 }

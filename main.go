@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"nusantara_service/configs"
+	"nusantara_service/internal/data/dataSources/cloudinary"
 	"nusantara_service/internal/middlewares"
 	"nusantara_service/routes"
 	"os"
@@ -31,7 +32,12 @@ func main() {
 		log.Printf("ROUTE %s %s", r.Method, r.Path)
 	}
 
-	routes.Routes(e, db, rdb)
+	cloudinarySvc, err := cloudinary.NewCloudinaryService()
+	if err != nil {
+		log.Fatalf("Failed to initialize Cloudinary service: %v", err)
+	}
+
+	routes.Routes(e, db, rdb, &cloudinarySvc)
 
 	port := os.Getenv("PORT")
 	if port == "" {

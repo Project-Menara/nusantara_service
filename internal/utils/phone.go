@@ -1,8 +1,6 @@
 package utils
 
 import (
-	"fmt"
-	"regexp"
 	"strings"
 	"unicode"
 )
@@ -16,24 +14,6 @@ func IsDigitsOnly(s string) bool {
 		}
 	}
 	return true
-}
-
-func IsDigitsPinOnly(pin string) bool {
-	l := len(pin)
-	if strings.HasPrefix(pin, "-") {
-		l = l - 1
-		pin = pin[1:]
-	}
-
-	reg := fmt.Sprintf("\\d{%d}", l)
-
-	rs, err := regexp.MatchString(reg, pin)
-
-	if err != nil {
-		return false
-	}
-
-	return rs
 }
 
 func NormalizePhone(phone string) string {

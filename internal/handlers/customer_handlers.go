@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/dto"
@@ -113,7 +114,7 @@ func (h *CustomerHandler) NewPin(c echo.Context) error {
 		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
 	}
 
-	return response.Success(c, http.StatusOK, "PIN saved temporarily", nil)
+	return response.Success(c, http.StatusOK, "PIN saved", nil)
 }
 
 func (h *CustomerHandler) ConfirmationPin(c echo.Context) error {
@@ -246,4 +247,208 @@ func (h *CustomerHandler) LoginCustomer(c echo.Context) error {
 	}
 
 	return response.Success(c, http.StatusOK, "login success", token)
+}
+
+func (h *CustomerHandler) UpdateProfile(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	var req dto.UpdateCustomerRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request payload", err.Error())
+	}
+
+	var photoFile *multipart.FileHeader
+	file, err := c.FormFile("photo")
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "failed to get photo file", err.Error())
+	}
+	if file != nil {
+		photoFile = file
+	}
+
+	updatedUser, err := h.CustomerService.UpdateProfileCustomer(c.Request().Context(), custID, req, photoFile)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, "failed to update profile", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Profile updated successfully", updatedUser)
+}
+
+func (h *CustomerHandler) VerifyPINCustomer(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	var req dto.VerifyPINCustomerRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "Failed to bind request", err.Error())
+	}
+
+	err := h.CustomerService.VerifyPINCustomer(c.Request().Context(), custID, req)
+	if err != nil {
+		var cooldownErr *response.CooldownError
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		if errors.As(err, &cooldownErr) {
+			return response.Error(c, http.StatusTooManyRequests, cooldownErr.Message, map[string]interface{}{
+				"retry_after_seconds": int(cooldownErr.RetryAfter.Seconds()),
+				"retry_after_human":   fmt.Sprintf("%.0f seconds", cooldownErr.RetryAfter.Seconds()),
+			})
+		}
+		var attemptErr *response.VerifyPINAttemptError
+		if errors.As(err, &attemptErr) {
+			return response.Error(c, http.StatusUnauthorized, attemptErr.Message, map[string]interface{}{
+				"remaining_attempts": fmt.Sprintf("%s. Sisa %d percobaan lagi.", attemptErr.Message, attemptErr.RemainingAttempts),
+			})
+		}
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update profile")
+	}
+
+	return response.Success(c, http.StatusOK, "Verify PIN Success", nil)
+}
+
+func (h *CustomerHandler) NewPinCustomer(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	var req dto.NewPINCustomer
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, response.NewCustomError(response.ErrBadRequest, "invalid request", 400))
+	}
+
+	if err := h.CustomerService.NewPINCustomer(c.Request().Context(), custID, req); err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Pin Saved", nil)
+}
+
+func (h *CustomerHandler) ConfirmationPINCustomer(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	var req dto.ConfirmNewPINCustomer
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, response.NewCustomError(response.ErrBadRequest, "invalid request", 400))
+	}
+
+	customer, err := h.CustomerService.ConfirmationPINCustomerUpdate(c.Request().Context(), custID, req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Update Password Success", customer)
+}
+
+func (h *CustomerHandler) NewPhoneCustomer(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	var req dto.NewPhoneCustomerRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, response.NewCustomError(response.ErrBadRequest, "invalid request", 400))
+	}
+
+	err := h.CustomerService.NewPhoneCustomer(c.Request().Context(), custID, req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Verify OTP via WhatsApp", nil)
+}
+
+func (h *CustomerHandler) VerifyCodeOTPCustomerUpdate(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	var req dto.VerifyOTPCustomerUpdateRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, response.NewCustomError(response.ErrBadRequest, "invalid request", 400))
+	}
+
+	customer, err := h.CustomerService.VerifyCodeOTPCustomerUpdate(c.Request().Context(), custID, req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Phone Updated Success", customer)
 }

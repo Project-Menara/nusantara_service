@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"nusantara_service/configs"
+	"nusantara_service/internal/data/dataSources/cloudinary"
 	"nusantara_service/internal/data/dataSources/twilio"
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/domain/entities"
@@ -22,12 +24,13 @@ import (
 )
 
 type CustomerService struct {
-	repo repositories.CustomerRepository
-	rdb  *redis.Client
+	repo          repositories.CustomerRepository
+	rdb           *redis.Client
+	cloudinarySvc cloudinary.CloudinaryService
 }
 
-func NewCustomerUsecase(repo repositories.CustomerRepository, rdb *redis.Client) services.CustomerService {
-	return &CustomerService{repo: repo, rdb: rdb}
+func NewCustomerUsecase(repo repositories.CustomerRepository, rdb *redis.Client, cloudinarySvc *cloudinary.CloudinaryService) services.CustomerService {
+	return &CustomerService{repo: repo, rdb: rdb, cloudinarySvc: *cloudinarySvc}
 }
 
 func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequest) (*response.CheckPhoneResult, error) {
@@ -43,7 +46,7 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 		return nil, response.NewCustomError(response.ErrBadRequest, "phone number must be 11 to 13 digits", 400)
 	}
 
-	if !utils.IsPhoneDigitsOnly(normalized) {
+	if !utils.IsPhoneDigitsOnly(phone) {
 		return nil, response.NewCustomError(response.ErrBadRequest, "phone number must contain only digits", 400)
 	}
 
@@ -252,7 +255,7 @@ func (u *CustomerService) NewPinCustomer(ctx context.Context, req dto.NewPinRequ
 	if !utils.IsDigitsOnly(pin) {
 		return response.NewCustomError(response.ErrBadRequest, "PIN must contain only digits", 400)
 	}
-	if len(req.PIN) != 6 {
+	if len(pin) != 6 {
 		return response.NewCustomError(response.ErrBadRequest, "PIN must be 6 digits", 400)
 	}
 
@@ -269,7 +272,20 @@ func (u *CustomerService) NewPinCustomer(ctx context.Context, req dto.NewPinRequ
 
 // ConfirmPinCustomer implements services.CustomerService.
 func (u *CustomerService) ConfirmPinCustomer(ctx context.Context, req dto.ConfirmPinRequest) (*entities.UserEntity, string, error) {
-	normalizedPhone := utils.NormalizePhone(req.Phone)
+	pin := strings.TrimSpace(req.ConfirmPIN)
+	phone := strings.TrimSpace(req.Phone)
+
+	if pin == "" || phone == "" {
+		return nil, "", response.NewCustomError(response.ErrBadRequest, "phone and pin required", 400)
+	}
+	if !utils.IsDigitsOnly(pin) {
+		return nil, "", response.NewCustomError(response.ErrBadRequest, "Confirmation PIN must contain only digits", 400)
+	}
+	if len(pin) != 6 {
+		return nil, "", response.NewCustomError(response.ErrBadRequest, "Confirmation PIN must be 6 digits", 400)
+	}
+
+	normalizedPhone := utils.NormalizePhone(phone)
 	redisKey := fmt.Sprintf("newpin:%s", normalizedPhone)
 
 	storedPIN, err := configs.GetRedis(ctx, redisKey)
@@ -289,7 +305,7 @@ func (u *CustomerService) ConfirmPinCustomer(ctx context.Context, req dto.Confir
 		return nil, "", response.NewCustomError(response.ErrInternal, "failed to get user", 500)
 	}
 
-	hashedPin, err := utils.HashPassword(req.ConfirmPIN)
+	hashedPin, err := utils.HashPassword(pin)
 	if err != nil {
 		return nil, "", response.NewCustomError(response.ErrInternal, "failed to hash pin", 500)
 	}
@@ -362,6 +378,24 @@ func (u *CustomerService) LoginCustomer(ctx context.Context, req dto.LoginCustom
 	if strings.TrimSpace(req.Pin) == "" {
 		return "", response.NewCustomError(response.ErrBadRequest, "pin is required", 400)
 	}
+
+	if !utils.IsDigitsOnly(req.Pin) {
+		return "", response.NewCustomError(response.ErrBadRequest, "Confirmation PIN must contain only digits", 400)
+	}
+	if len(req.Pin) != 6 {
+		return "", response.NewCustomError(response.ErrBadRequest, "Confirmation PIN must be 6 digits", 400)
+	}
+
+	if req.Pin == "" || req.Phone == "" {
+		return "", response.NewCustomError(response.ErrBadRequest, "phone and pin required", 400)
+	}
+	if !utils.IsDigitsOnly(req.Pin) {
+		return "", response.NewCustomError(response.ErrBadRequest, "PIN must contain only digits", 400)
+	}
+	if len(req.Pin) != 6 {
+		return "", response.NewCustomError(response.ErrBadRequest, "PIN must be 6 digits", 400)
+	}
+
 	loginKey := fmt.Sprintf("login_attempts_customer:%s", req.Phone)
 
 	const maxAttempts = 5
@@ -478,4 +512,326 @@ func (u *CustomerService) CheckTokenBlacklisted(ctx context.Context, token strin
 	}
 	return val == "blacklisted", nil // Key exists, check its value
 
+}
+
+// UpdateProfileCustomer implements services.CustomerService.
+func (u *CustomerService) UpdateProfileCustomer(ctx context.Context, userId string, req dto.UpdateCustomerRequest, photoFileHeader *multipart.FileHeader) (*entities.UserEntity, error) {
+	user, err := u.repo.FindByUseIDCustomer(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "user not found", 404)
+		}
+		return nil, response.NewCustomError(response.ErrInternal, "failed to get user", 500)
+	}
+
+	if req.Name != "" {
+		user.Name = req.Name
+	}
+	if req.Username != "" {
+		existingUser, _ := u.repo.FindByUsername(ctx, req.Username)
+		if existingUser != nil && existingUser.ID != userId {
+			return nil, response.NewCustomError(response.ErrExists, "username already exists", 409)
+		}
+		user.Username = req.Username
+	}
+
+	if req.Email != "" {
+		existingUser, _ := u.repo.FindByEmail(ctx, req.Email)
+		if existingUser != nil && existingUser.ID != userId {
+			return nil, response.NewCustomError(response.ErrExists, "email already exists", 409)
+		}
+		if !strings.HasSuffix(strings.ToLower(req.Email), "@gmail.com") {
+			return nil, response.NewCustomError(response.ErrBadRequest, "only Gmail addresses are allowed", 400)
+		}
+		user.Email = req.Email
+	}
+
+	if req.Gender != "" {
+		user.Gender = &req.Gender
+	}
+	if req.DateOfBirth != "" {
+		dob, err := time.Parse("2006-01-02", req.DateOfBirth)
+		if err != nil {
+			return nil, response.NewCustomError(response.ErrBadRequest, "invalid date of birth format, use YYYY-MM-DD", 400)
+		}
+		user.DateOfBirth = &dob
+	}
+
+	if photoFileHeader != nil {
+		if user.Photo != nil && *user.Photo != "" {
+			publicID := utils.ExtractPublicIDFromCloudinaryURL(*user.Photo)
+			if publicID == "" {
+				if err := u.cloudinarySvc.DestroyImage(ctx, publicID); err != nil {
+					fmt.Printf("Warning: Failed to delete old image from Cloudinary: %v\n", err)
+				}
+			}
+		}
+
+		folder := fmt.Sprintf("nusantara_service/customer_profiles/%s", userId)
+		photoURL, err := u.cloudinarySvc.UploadImage(ctx, photoFileHeader, folder)
+		if err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to upload photo to Cloudinary", 500)
+		}
+
+		user.Photo = &photoURL
+
+	}
+
+	updatedUser, err := u.repo.UpdateCustomer(ctx, userId, user)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrInternal, "failed to update customer profile", 500)
+	}
+
+	return updatedUser, nil
+
+}
+
+// VerifyPINCustomer implements services.CustomerService.
+func (u *CustomerService) VerifyPINCustomer(ctx context.Context, userId string, req dto.VerifyPINCustomerRequest) error {
+	if strings.TrimSpace(req.PIN) == "" {
+		return response.NewCustomError(response.ErrBadRequest, "pin is required", 400)
+	}
+
+	if !utils.IsDigitsOnly(req.PIN) {
+		return response.NewCustomError(response.ErrBadRequest, "Confirmation PIN must contain only digits", 400)
+	}
+	if len(req.PIN) != 6 {
+		return response.NewCustomError(response.ErrBadRequest, "Confirmation PIN must be 6 digits", 400)
+	}
+
+	pinKey := fmt.Sprintf("pin_attempts:%s", userId)
+	const maxAttempts = 5
+	const cooldownDuration = 1 * time.Minute
+
+	attempts, err := u.rdb.Get(ctx, pinKey).Int()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return response.NewCustomError(response.ErrInternal, "failed to pinkey attempts from redis", 500)
+	}
+
+	ttl, err := u.rdb.TTL(ctx, pinKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return response.NewCustomError(response.ErrInternal, "failed to get TTL from redis", 500)
+	}
+
+	if attempts >= maxAttempts {
+		if ttl > 0 {
+			return &response.CooldownError{
+				Message:    "Too many pin attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+	}
+
+	customer, err := u.repo.FindByUseIDCustomer(ctx, userId)
+	if err != nil {
+		currentAttempts, err := u.rdb.Incr(ctx, pinKey).Result()
+		if err != nil {
+			return response.NewCustomError(response.ErrInternal, "failed to increment pin attempts", 500)
+		}
+
+		u.rdb.Expire(ctx, pinKey, cooldownDuration)
+		if int(currentAttempts) >= maxAttempts {
+			ttl, _ := u.rdb.TTL(ctx, pinKey).Result()
+			if ttl <= 0 {
+				ttl = cooldownDuration
+			}
+			return &response.CooldownError{
+				Message:    "Too many pin attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+
+		remainingAttempts := maxAttempts - int(currentAttempts)
+		if remainingAttempts < 0 {
+			remainingAttempts = 0
+		}
+
+		return &response.VerifyPINAttemptError{
+			Message:           "user not permission",
+			RemainingAttempts: remainingAttempts,
+		}
+	}
+
+	isPin := utils.CheckPasswordHash(req.PIN, customer.Password)
+	if !isPin {
+		currentAttempts, err := u.rdb.Incr(ctx, pinKey).Result()
+		if err != nil {
+			return fmt.Errorf("failed to increment pin attempts: %w", err)
+		}
+		u.rdb.Expire(ctx, pinKey, cooldownDuration)
+
+		if int(currentAttempts) >= maxAttempts {
+			ttl, _ := u.rdb.TTL(ctx, pinKey).Result()
+			if ttl <= 0 {
+				ttl = cooldownDuration
+			}
+			return &response.CooldownError{
+				Message:    "Too many pin attempts. Please try again later.",
+				RetryAfter: ttl,
+			}
+		}
+
+		remainingAttempts := maxAttempts - int(currentAttempts)
+		if remainingAttempts < 0 {
+			remainingAttempts = 0
+		}
+
+		return &response.VerifyPINAttemptError{
+			Message:           "pin incorrect",
+			RemainingAttempts: remainingAttempts,
+		}
+	}
+
+	u.rdb.Del(ctx, pinKey)
+
+	return nil
+}
+
+// NewPINCustomer implements services.CustomerService.
+func (u *CustomerService) NewPINCustomer(ctx context.Context, userId string, req dto.NewPINCustomer) error {
+	NewPin := strings.TrimSpace(req.NewPIN)
+
+	if NewPin == "" {
+		return response.NewCustomError(response.ErrBadRequest, "new pin required", 400)
+	}
+
+	if !utils.IsDigitsOnly(NewPin) {
+		return response.NewCustomError(response.ErrBadRequest, "PIN must contain only digits", 400)
+	}
+	if len(NewPin) != 6 {
+		return response.NewCustomError(response.ErrBadRequest, "PIN must be 6 digits", 400)
+	}
+
+	redisKey := fmt.Sprintf("new_pin_customer:%s", userId)
+	err := configs.SetRedis(ctx, redisKey, NewPin, 15*time.Minute)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to save pin", 500)
+	}
+
+	return nil
+}
+
+// ConfirmationPINCustomerUpdate implements services.CustomerService.
+func (u *CustomerService) ConfirmationPINCustomerUpdate(ctx context.Context, userId string, req dto.ConfirmNewPINCustomer) (*entities.UserEntity, error) {
+	pin := strings.TrimSpace(req.ConfirmPIN)
+	if pin == "" {
+		return nil, response.NewCustomError(response.ErrBadRequest, "confirmation pin required", 400)
+	}
+
+	if !utils.IsDigitsOnly(pin) {
+		return nil, response.NewCustomError(response.ErrBadRequest, "PIN must contain only digits", 400)
+	}
+	if len(pin) != 6 {
+		return nil, response.NewCustomError(response.ErrBadRequest, "PIN must be 6 digits", 400)
+	}
+
+	redisKey := fmt.Sprintf("new_pin_customer:%s", userId)
+	storedPin, err := configs.GetRedis(ctx, redisKey)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrUnauthorized, "PIN expired or not set", 401)
+	}
+
+	if storedPin != req.ConfirmPIN {
+		return nil, response.NewCustomError(response.ErrUnauthorized, "PIN does not match", 401)
+	}
+
+	customer, err := u.repo.FindByUseIDCustomer(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "user not found", 404)
+		}
+		return nil, response.NewCustomError(response.ErrInternal, "failed to get user", 500)
+	}
+
+	hashedPin, err := utils.HashPassword(pin)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrInternal, "failed to hash pin", 500)
+	}
+
+	err = u.repo.UpdatePinCustomer(ctx, userId, hashedPin)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrInternal, "failed to save pin", 500)
+	}
+
+	_ = configs.DeleteRedis(ctx, redisKey)
+
+	return customer, nil
+}
+
+// NewPhoneCustomer implements services.CustomerService.
+func (u *CustomerService) NewPhoneCustomer(ctx context.Context, userId string, req dto.NewPhoneCustomerRequest) error {
+	NewPhone := strings.TrimSpace(req.Phone)
+
+	if NewPhone == "" {
+		return response.NewCustomError(response.ErrBadRequest, "New Phone required", 400)
+	}
+
+	normalized := utils.NormalizePhone(NewPhone)
+	digitsOnly := strings.TrimPrefix(normalized, "+")
+
+	if len(digitsOnly) < 11 || len(digitsOnly) > 13 {
+		return response.NewCustomError(response.ErrBadRequest, "phone number must be 11 to 13 digits", 400)
+	}
+
+	if !utils.IsPhoneDigitsOnly(normalized) {
+		return response.NewCustomError(response.ErrBadRequest, "phone number must contain only digits", 400)
+	}
+
+	_, err := u.repo.FindByUseIDCustomer(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "user not found", 404)
+		}
+		return response.NewCustomError(response.ErrInternal, "failed to get user", 500)
+	}
+
+	redisKey := fmt.Sprintf("otp_new_phone:%s", normalized)
+	otpCode := otp.GenerateOTP(6)
+	if err := configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1); err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to store OTP", 500)
+	}
+
+	if err := twilio.SendWhatsAppOTP(normalized, otpCode); err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+	}
+
+	return nil
+}
+
+// VerifyCodeOTPCustomerUpdate implements services.CustomerService.
+func (u *CustomerService) VerifyCodeOTPCustomerUpdate(ctx context.Context, userId string, req dto.VerifyOTPCustomerUpdateRequest) (*entities.UserEntity, error) {
+	if strings.TrimSpace(req.Phone) == "" || strings.TrimSpace(req.Code) == "" {
+		return nil, response.NewCustomError(response.ErrBadRequest, "phone and code are required", 400)
+	}
+
+	normalizedPhone := utils.NormalizePhone(req.Phone)
+
+	customer, err := u.repo.FindByUseIDCustomer(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "user not found", 404)
+		}
+		return nil, response.NewCustomError(response.ErrInternal, "failed to get user", 500)
+	}
+
+	redisKey := fmt.Sprintf("otp_new_phone:%s", normalizedPhone)
+	storeCode, err := configs.GetRedis(ctx, redisKey)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrUnauthorized, "OTP expired or invalid", 401)
+	}
+
+	if storeCode != req.Code {
+		return nil, response.NewCustomError(response.ErrUnauthorized, "invalid OTP code", 401)
+	}
+
+	_ = configs.DeleteRedis(ctx, redisKey)
+
+	customer.Phone = &req.Phone
+
+	data, err := u.repo.ChangePhoneCustomer(ctx, userId, customer)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrInternal, "failed to update user phone", 500)
+	}
+
+	return data, nil
 }

@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"mime/multipart"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/dto"
 	"nusantara_service/internal/response"
@@ -18,4 +19,12 @@ type CustomerService interface {
 	CheckTokenBlacklisted(ctx context.Context, token string) (bool, error)
 	LogoutCustomer(ctx context.Context, userId, token string) error
 	LoginCustomer(ctx context.Context, req dto.LoginCustomerRequest) (string, error)
+	UpdateProfileCustomer(ctx context.Context, userId string, req dto.UpdateCustomerRequest, photoFileHeader *multipart.FileHeader) (*entities.UserEntity, error)
+
+	//Change Phone
+	VerifyPINCustomer(ctx context.Context, userId string, req dto.VerifyPINCustomerRequest) error
+	NewPINCustomer(ctx context.Context, userId string, req dto.NewPINCustomer) error
+	ConfirmationPINCustomerUpdate(ctx context.Context, userId string, req dto.ConfirmNewPINCustomer) (*entities.UserEntity, error)
+	NewPhoneCustomer(ctx context.Context, userId string, req dto.NewPhoneCustomerRequest) error
+	VerifyCodeOTPCustomerUpdate(ctx context.Context, userId string, req dto.VerifyOTPCustomerUpdateRequest) (*entities.UserEntity, error)
 }

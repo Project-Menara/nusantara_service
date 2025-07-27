@@ -113,3 +113,40 @@ func (u *CustomerRepositoryImpl) FindByUseIDCustomer(ctx context.Context, userID
 
 	return &user, nil
 }
+
+// UpdateCustomer implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) UpdateCustomer(ctx context.Context, userId string, data *entities.UserEntity) (*entities.UserEntity, error) {
+	var user entities.UserEntity
+	if err := u.db.WithContext(ctx).Preload("Role").First(&user, "id = ?", userId).Where("role").Error; err != nil {
+		return nil, err
+	}
+
+	user.Name = data.Name
+	user.Email = data.Email
+	user.Username = data.Username
+	user.Gender = data.Gender
+	user.DateOfBirth = data.DateOfBirth
+	user.Photo = data.Photo
+
+	if err := u.db.WithContext(ctx).Updates(&user).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+// ChangePhoneCustomer implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) ChangePhoneCustomer(ctx context.Context, userId string, data *entities.UserEntity) (*entities.UserEntity, error) {
+	var user entities.UserEntity
+	if err := u.db.WithContext(ctx).Preload("Role").First(&user, "id = ?", userId).Where("role").Error; err != nil {
+		return nil, err
+	}
+
+	user.Phone = data.Phone
+
+	if err := u.db.WithContext(ctx).Updates(&user).Error; err != nil {
+		return nil, err
+	}
+
+	return &user, nil
+}

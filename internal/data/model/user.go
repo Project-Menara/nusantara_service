@@ -16,7 +16,7 @@ type User struct {
 	Password    string    `gorm:"type:varchar(255);not null"`
 	Gender      string    `gorm:"type:varchar(100);"`
 	DateOfBirth time.Time `gorm:"type:date;"`
-	Photo       string    `gorm:"type:varchar(100)"`
+	Photo       string    `gorm:"type:varchar(255)"`
 
 	RoleID uuid.UUID `gorm:"type:uuid"`
 	Role   Role      `gorm:"foreignKey:RoleID"`
