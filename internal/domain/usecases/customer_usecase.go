@@ -243,14 +243,23 @@ func (u *CustomerService) VerifyCodeOTP(ctx context.Context, req dto.VerifyOTPRe
 
 // NewPinCustomer implements services.CustomerService.
 func (u *CustomerService) NewPinCustomer(ctx context.Context, req dto.NewPinRequest) error {
-	if strings.TrimSpace(req.PIN) == "" || strings.TrimSpace(req.Phone) == "" {
+	pin := strings.TrimSpace(req.PIN)
+	phone := strings.TrimSpace(req.Phone)
+
+	if pin == "" || phone == "" {
 		return response.NewCustomError(response.ErrBadRequest, "phone and pin required", 400)
 	}
+	if !utils.IsDigitsOnly(pin) {
+		return response.NewCustomError(response.ErrBadRequest, "PIN must contain only digits", 400)
+	}
+	if len(req.PIN) != 6 {
+		return response.NewCustomError(response.ErrBadRequest, "PIN must be 6 digits", 400)
+	}
 
-	normalizedPhone := utils.NormalizePhone(req.Phone)
+	normalizedPhone := utils.NormalizePhone(phone)
 	redisKey := fmt.Sprintf("newpin:%s", normalizedPhone)
 
-	err := configs.SetRedis(ctx, redisKey, req.PIN, 15*time.Minute)
+	err := configs.SetRedis(ctx, redisKey, pin, 15*time.Minute)
 	if err != nil {
 		return response.NewCustomError(response.ErrInternal, "failed to save pin temporarily", 500)
 	}
