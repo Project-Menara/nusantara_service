@@ -10,7 +10,7 @@ import (
 type Banner struct {
 	ID          uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
 	Photo       string    `gorm:"type:varchar(255)"`
-	Name        string    `gorm:"type:varchar(255);unique;not null"`
+	Name        string    `gorm:"type:varchar(255);not null"`
 	Description string    `gorm:"type:text"`
 	Status      int       `gorm:"type:int;not null"`
 	UserID      uuid.UUID `gorm:"type:uuid"`

@@ -1,23 +1,36 @@
 package utils
 
-import "strings"
+import (
+	"net/url"
+	"path"
+	"strings"
+)
 
-func ExtractPublicIDFromCloudinaryURL(url string) string {
-	parts := strings.Split(url, "/upload/")
-	if len(parts) < 2 {
+func ExtractPublicIDFromCloudinaryURL(imageURL string) string {
+	parts := strings.Split(imageURL, "/upload/")
+	if len(parts) != 2 {
 		return ""
 	}
 
-	pathAfterUpload := parts[1]
-	if len(pathAfterUpload) > 1 && pathAfterUpload[0] == 'v' {
-		if idx := strings.Index(pathAfterUpload, "/"); idx != -1 {
-			pathAfterUpload = pathAfterUpload[idx+1:]
-		}
+	// Ambil bagian setelah /upload/
+	afterUpload := parts[1]
+
+	// Hilangkan versi (v12345678/...)
+	slashIndex := strings.Index(afterUpload, "/")
+	if slashIndex == -1 {
+		return ""
 	}
 
-	if idx := strings.LastIndex(pathAfterUpload, "?"); idx != -1 {
-		pathAfterUpload = pathAfterUpload[:idx]
+	// Ambil path tanpa versi
+	pathWithFile := afterUpload[slashIndex+1:]
+
+	// Decode URL-encoded string (e.g., %20 → space)
+	decodedPath, err := url.PathUnescape(pathWithFile)
+	if err != nil {
+		return ""
 	}
 
-	return pathAfterUpload
+	// Hilangkan ekstensi file (.webp, .png, .jpg, dll)
+	publicID := strings.TrimSuffix(decodedPath, path.Ext(decodedPath))
+	return publicID
 }

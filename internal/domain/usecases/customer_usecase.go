@@ -567,8 +567,9 @@ func (u *CustomerService) UpdateProfileCustomer(ctx context.Context, userId stri
 			}
 		}
 
-		folder := fmt.Sprintf("nusantara_service/customer_profiles/%s", userId)
-		photoURL, err := u.cloudinarySvc.UploadImage(ctx, photoFileHeader, folder)
+		folder := fmt.Sprintf("nusantara_service/customer_profiles/%s", user.Username)
+		filename := fmt.Sprintf("profile_%s", userId)
+		photoURL, err := u.cloudinarySvc.UploadImage(ctx, photoFileHeader, folder, filename)
 		if err != nil {
 			return nil, response.NewCustomError(response.ErrInternal, "failed to upload photo to Cloudinary", 500)
 		}

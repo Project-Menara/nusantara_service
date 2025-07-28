@@ -31,7 +31,7 @@ func (b *BannerRepositoryImpl) CountAll(ctx context.Context) (int, error) {
 // FindByName implements repositories.BannerRepository.
 func (b *BannerRepositoryImpl) FindByName(ctx context.Context, name string) (*entities.BannerEntity, error) {
 	var banner entities.BannerEntity
-	if err := b.db.WithContext(ctx).First(&banner, "name = ?", name).Error; err != nil {
+	if err := b.db.WithContext(ctx).First(&banner, "name = ? AND deleted_at IS NULL", name).Error; err != nil {
 		return nil, err
 	}
 

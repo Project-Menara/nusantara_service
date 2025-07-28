@@ -12,7 +12,7 @@ import (
 )
 
 type CloudinaryService interface {
-	UploadImage(ctx context.Context, file *multipart.FileHeader, folder string) (string, error)
+	UploadImage(ctx context.Context, file *multipart.FileHeader, folder string, filename string) (string, error)
 	DestroyImage(ctx context.Context, publicID string) error
 }
 
@@ -38,35 +38,47 @@ func NewCloudinaryService() (CloudinaryService, error) {
 }
 
 // UploadImage implements CloudinaryService.
-func (c *cloudinaryServiceImpl) UploadImage(ctx context.Context, file *multipart.FileHeader, folder string) (string, error) {
-	src, err := file.Open()
+func (c *cloudinaryServiceImpl) UploadImage(ctx context.Context, file *multipart.FileHeader, folder string, filename string) (string, error) {
+	fileContent, err := file.Open()
 	if err != nil {
-		return "", fmt.Errorf("failed to open file: %w", err)
+		return "", err
+	}
+	defer fileContent.Close()
+
+	publicID := fmt.Sprintf("%s/%s", folder, filename)
+
+	uploadParam := uploader.UploadParams{
+		PublicID:     publicID,
+		Folder:       folder, // folder sudah di PublicID
+		Overwrite:    boolPtr(true),
+		ResourceType: "image",
 	}
 
-	defer src.Close()
-
-	uploadResult, err := c.cld.Upload.Upload(ctx, src, uploader.UploadParams{
-		Folder: folder,
-	})
-
+	resp, err := c.cld.Upload.Upload(ctx, fileContent, uploadParam)
 	if err != nil {
-		return "", fmt.Errorf("failed to upload file to cloudinary: %w", err)
+		return "", err
 	}
-
-	return uploadResult.SecureURL, nil
+	return resp.SecureURL, nil
 
 }
 
 // DestroyImage implements CloudinaryService.
 func (c *cloudinaryServiceImpl) DestroyImage(ctx context.Context, publicID string) error {
-	invalidate := true
-	_, err := c.cld.Upload.Destroy(ctx, uploader.DestroyParams{
+	resp, err := c.cld.Upload.Destroy(ctx, uploader.DestroyParams{
 		PublicID:   publicID,
-		Invalidate: &invalidate,
+		Invalidate: boolPtr(true),
 	})
 	if err != nil {
+		fmt.Printf("Error deleting image from cloudinary: %v, PublicID: %s\n", err, publicID) // Added logging
 		return fmt.Errorf("failed to delete image from cloudinary: %w", err)
 	}
+	if resp.Result != "ok" { // Cloudinary indicates success with "ok"
+		fmt.Printf("Cloudinary destroy result not 'ok': %s, PublicID: %s\n", resp.Result, publicID) // Added logging for non-ok result
+		return fmt.Errorf("cloudinary image deletion failed with result: %s", resp.Result)
+	}
+	fmt.Println("Deleting public ID:", publicID)
 	return nil
+}
+func boolPtr(b bool) *bool {
+	return &b
 }

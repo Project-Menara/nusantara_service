@@ -69,8 +69,10 @@ func (b *BannerService) CreateBanner(ctx context.Context, userId string, req dto
 		return nil, response.NewCustomError(response.ErrInternal, "failed to get user", 500)
 	}
 
-	folder := fmt.Sprintf("nusantara_service/banner/%s", req.Name)
-	imageUrl, err := b.cloudinary.UploadImage(ctx, image, folder)
+	folder := "nusantara_service/banner"
+	filename := fmt.Sprintf("banner_%s", req.Name) // id UUID unik banner
+
+	imageUrl, err := b.cloudinary.UploadImage(ctx, image, folder, filename)
 	if err != nil {
 		return nil, response.NewCustomError(response.ErrInternal, "failed to upload image", 500)
 	}
@@ -93,6 +95,8 @@ func (b *BannerService) CreateBanner(ctx context.Context, userId string, req dto
 	if err != nil {
 		return nil, response.NewCustomError(response.ErrInternal, "failed to create banner", 500)
 	}
+
+	b.InvalidateBannerCache(ctx)
 
 	return newBanner, nil
 
@@ -195,8 +199,11 @@ func (b *BannerService) UpdateBanner(ctx context.Context, userId string, id uuid
 			}
 		}
 
-		folder := fmt.Sprintf("nusantara_service/banner/%s", req.Name)
-		imageUrl, err := b.cloudinary.UploadImage(ctx, image, folder)
+		folder := "nusantara_service/banner"
+		filename := fmt.Sprintf("banner_%s", id.String()) // id UUID unik banner
+
+		imageUrl, err := b.cloudinary.UploadImage(ctx, image, folder, filename)
+
 		if err != nil {
 			return nil, response.NewCustomError(response.ErrInternal, "failed to upload image", 500)
 		}
@@ -223,6 +230,7 @@ func (b *BannerService) UpdateBanner(ctx context.Context, userId string, id uuid
 	if err != nil {
 		return nil, response.NewCustomError(response.ErrInternal, "Failed to update banner", 500)
 	}
+	b.InvalidateBannerCache(ctx)
 
 	return updatedBanner, nil
 
@@ -246,6 +254,19 @@ func (b *BannerService) DeleteBanner(ctx context.Context, id uuid.UUID) error {
 			}
 		}
 	}
+	b.InvalidateBannerCache(ctx)
 
 	return b.repo.Delete(ctx, id)
+}
+
+func (b *BannerService) InvalidateBannerCache(ctx context.Context) {
+	iter := b.rdb.Scan(ctx, 0, "banners:*", 0).Iterator()
+	for iter.Next(ctx) {
+		b.rdb.Del(ctx, iter.Val())
+	}
+
+	iterID := b.rdb.Scan(ctx, 0, "banner:*", 0).Iterator()
+	for iterID.Next(ctx) {
+		b.rdb.Del(ctx, iterID.Val())
+	}
 }
