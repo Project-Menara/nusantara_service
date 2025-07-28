@@ -80,5 +80,3 @@ func (u *UserRepositoryImpl) ChangePassword(ctx context.Context, userId string, 
 
 	return &user, nil
 }
-
-//END SUPERADMIN

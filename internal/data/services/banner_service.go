@@ -1,0 +1,18 @@
+package services
+
+import (
+	"context"
+	"mime/multipart"
+	"nusantara_service/internal/domain/entities"
+	"nusantara_service/internal/dto"
+
+	"github.com/google/uuid"
+)
+
+type BannerService interface {
+	CreateBanner(ctx context.Context, userId string, req dto.CreateBannerRequest, image *multipart.FileHeader) (*entities.BannerEntity, error)
+	GetAllBanner(ctx context.Context, page, limit int) ([]*entities.BannerEntity, int, error)
+	GetByIdBanner(ctx context.Context, id uuid.UUID) (*entities.BannerEntity, error)
+	UpdateBanner(ctx context.Context, userId string, id uuid.UUID, req dto.UpdateBannerRequest, image *multipart.FileHeader) (*entities.BannerEntity, error)
+	DeleteBanner(ctx context.Context, id uuid.UUID) error
+}
