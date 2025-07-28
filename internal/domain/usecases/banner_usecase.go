@@ -2,9 +2,11 @@ package usecases
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"mime/multipart"
+	"nusantara_service/configs"
 	"nusantara_service/internal/data/dataSources/cloudinary"
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/domain/entities"
@@ -13,6 +15,7 @@ import (
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -98,6 +101,20 @@ func (b *BannerService) CreateBanner(ctx context.Context, userId string, req dto
 // GetAllBanner implements services.BannerService.
 func (b *BannerService) GetAllBanner(ctx context.Context, page int, limit int) ([]*entities.BannerEntity, int, error) {
 	offset := (page - 1) * limit
+	redisKey := fmt.Sprintf("banners:page=%d&limit=%d", page, limit)
+
+	// Cek apakah data ada di redis
+	cached, err := configs.GetRedis(ctx, redisKey)
+	if err == nil && cached != "" {
+		var cachedData struct {
+			Banners []*entities.BannerEntity `json:"banners"`
+			Total   int                      `json:"total"`
+		}
+		if err := json.Unmarshal([]byte(cached), &cachedData); err == nil {
+			return cachedData.Banners, cachedData.Total, nil
+		}
+	}
+
 	banners, err := b.repo.FindAll(ctx, limit, offset)
 	if err != nil {
 		return nil, 0, response.NewCustomError(response.ErrNotFound, "failed to find banner", 404)
@@ -107,12 +124,29 @@ func (b *BannerService) GetAllBanner(ctx context.Context, page int, limit int) (
 	if err != nil {
 		return nil, 0, response.NewCustomError(response.ErrBadRequest, "failed to count banner", 400)
 	}
+	dataToCache, _ := json.Marshal(map[string]interface{}{
+		"banners": banners,
+		"total":   total,
+	})
+
+	_ = configs.SetRedis(ctx, redisKey, dataToCache, time.Minute*30)
 
 	return banners, total, nil
 }
 
 // GetByIdBanner implements services.BannerService.
 func (b *BannerService) GetByIdBanner(ctx context.Context, id uuid.UUID) (*entities.BannerEntity, error) {
+	redisKey := fmt.Sprintf("banner:%s", id.String())
+
+	// Cek dari redis
+	cached, err := configs.GetRedis(ctx, redisKey)
+	if err == nil && cached != "" {
+		var banner entities.BannerEntity
+		if err := json.Unmarshal([]byte(cached), &banner); err == nil {
+			return &banner, nil
+		}
+	}
+
 	banner, err := b.repo.FindById(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -120,6 +154,9 @@ func (b *BannerService) GetByIdBanner(ctx context.Context, id uuid.UUID) (*entit
 		}
 		return nil, err
 	}
+
+	dataToCache, _ := json.Marshal(banner)
+	_ = configs.SetRedis(ctx, redisKey, dataToCache, time.Minute*30)
 
 	return banner, nil
 }
@@ -151,12 +188,13 @@ func (b *BannerService) UpdateBanner(ctx context.Context, userId string, id uuid
 	if image != nil {
 		if banner.Photo != "" {
 			publicID := utils.ExtractPublicIDFromCloudinaryURL(banner.Photo)
-			if publicID == "" {
+			if publicID != "" {
 				if err := b.cloudinary.DestroyImage(ctx, publicID); err != nil {
 					return nil, response.NewCustomError(response.ErrInternal, "failed to delete image", 500)
 				}
 			}
 		}
+
 		folder := fmt.Sprintf("nusantara_service/banner/%s", req.Name)
 		imageUrl, err := b.cloudinary.UploadImage(ctx, image, folder)
 		if err != nil {
@@ -166,13 +204,20 @@ func (b *BannerService) UpdateBanner(ctx context.Context, userId string, id uuid
 		banner.Photo = imageUrl
 	}
 
-	_, err = b.repo.FindByUserIDSuperAdmin(ctx, userId)
+	user, err := b.repo.FindByUserIDSuperAdmin(ctx, userId)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, response.NewCustomError(response.ErrNotFound, "user not found", 404)
 		}
 		return nil, response.NewCustomError(response.ErrInternal, "failed to get user", 500)
 	}
+
+	userUUID, err := uuid.Parse(user.ID)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrBadRequest, "invalid user ID", 400)
+	}
+
+	banner.UserID = userUUID
 
 	updatedBanner, err := b.repo.Update(ctx, id, banner)
 	if err != nil {
@@ -195,7 +240,7 @@ func (b *BannerService) DeleteBanner(ctx context.Context, id uuid.UUID) error {
 
 	if banner.Photo != "" {
 		publicID := utils.ExtractPublicIDFromCloudinaryURL(banner.Photo)
-		if publicID == "" {
+		if publicID != "" {
 			if err := b.cloudinary.DestroyImage(ctx, publicID); err != nil {
 				return response.NewCustomError(response.ErrInternal, "failed to delete image", 500)
 			}

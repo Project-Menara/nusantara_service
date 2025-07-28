@@ -560,7 +560,7 @@ func (u *CustomerService) UpdateProfileCustomer(ctx context.Context, userId stri
 	if photoFileHeader != nil {
 		if user.Photo != nil && *user.Photo != "" {
 			publicID := utils.ExtractPublicIDFromCloudinaryURL(*user.Photo)
-			if publicID == "" {
+			if publicID != "" {
 				if err := u.cloudinarySvc.DestroyImage(ctx, publicID); err != nil {
 					fmt.Printf("Warning: Failed to delete old image from Cloudinary: %v\n", err)
 				}

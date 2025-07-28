@@ -13,7 +13,7 @@ type BannerEntity struct {
 	Name        string     `gorm:"type:varchar(255);unique;not null" json:"name"`
 	Description string     `gorm:"type:text" json:"description"`
 	Status      int        `gorm:"type:int;not null" json:"status"`
-	UserID      uuid.UUID  `gorm:"type:uuid" `
+	UserID      uuid.UUID  `gorm:"type:uuid" json:"-"`
 	User        UserEntity `gorm:"foreignKey:UserID"`
 
 	CreatedAt time.Time      `gorm:"autoCreateTime"`

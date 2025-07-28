@@ -51,7 +51,7 @@ func (b *BannerRepositoryImpl) Create(ctx context.Context, banner *entities.Bann
 // FindAll implements repositories.BannerRepository.
 func (b *BannerRepositoryImpl) FindAll(ctx context.Context, limit int, offset int) ([]*entities.BannerEntity, error) {
 	var banners []*entities.BannerEntity
-	if err := b.db.WithContext(ctx).Limit(limit).Offset(offset).Find(&banners).Error; err != nil {
+	if err := b.db.WithContext(ctx).Preload("User").Preload("User.Role").Limit(limit).Offset(offset).Find(&banners).Error; err != nil {
 		return nil, err
 	}
 
@@ -61,7 +61,7 @@ func (b *BannerRepositoryImpl) FindAll(ctx context.Context, limit int, offset in
 // FindById implements repositories.BannerRepository.
 func (b *BannerRepositoryImpl) FindById(ctx context.Context, id uuid.UUID) (*entities.BannerEntity, error) {
 	var banner entities.BannerEntity
-	if err := b.db.WithContext(ctx).First(&banner, "id = ?", id).Error; err != nil {
+	if err := b.db.WithContext(ctx).Preload("User").Preload("User.Role").First(&banner, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 
@@ -71,7 +71,7 @@ func (b *BannerRepositoryImpl) FindById(ctx context.Context, id uuid.UUID) (*ent
 // Update implements repositories.BannerRepository.
 func (b *BannerRepositoryImpl) Update(ctx context.Context, id uuid.UUID, data *entities.BannerEntity) (*entities.BannerEntity, error) {
 	var banner entities.BannerEntity
-	if err := b.db.WithContext(ctx).First(&banner, "id = ?", id).Error; err != nil {
+	if err := b.db.WithContext(ctx).Preload("User").Preload("User.Role").First(&banner, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 

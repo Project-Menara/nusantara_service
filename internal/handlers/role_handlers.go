@@ -41,7 +41,7 @@ func (r *RoleHandler) CreateRole(c echo.Context) error {
 }
 
 func (r *RoleHandler) GetAllRole(c echo.Context) error {
-	pageInt, limitInt := utils.ParsePaginationParams(c)
+	pageInt, limitInt := utils.ParsePaginationParams(c, 10)
 
 	roles, total, err := r.RoleService.GetAllRole(c.Request().Context(), pageInt, limitInt)
 	if err != nil {

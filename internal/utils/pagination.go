@@ -8,9 +8,9 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func ParsePaginationParams(c echo.Context) (page int, limit int) {
+func ParsePaginationParams(c echo.Context, defaultLimit int) (page int, limit int) {
 	page = 1
-	limit = 10
+	limit = defaultLimit
 
 	pageParam := c.QueryParam("page")
 	limitParam := c.QueryParam("limit")

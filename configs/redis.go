@@ -27,7 +27,7 @@ func InitRedis() *redis.Client {
 	return rdb
 }
 
-func SetRedis(ctx context.Context, key, value string, duration time.Duration) error {
+func SetRedis(ctx context.Context, key string, value interface{}, duration time.Duration) error {
 	return rdb.Set(ctx, key, value, duration).Err()
 }
 

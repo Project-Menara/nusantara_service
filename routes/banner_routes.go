@@ -18,4 +18,8 @@ func BannerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinary *clo
 	bannerHandler := handlers.NewBannerHandler(bannerService)
 
 	e.POST("/create", bannerHandler.CreateBanner, middlewares.JWTMiddleware(rdb))
+	e.GET("", bannerHandler.GetAllBanner, middlewares.JWTMiddleware(rdb))
+	e.GET("/:id", bannerHandler.GetByIdBanner, middlewares.JWTMiddleware(rdb))
+	e.PUT("/:id/edit", bannerHandler.UpdateBanner, middlewares.JWTMiddleware(rdb))
+	e.DELETE("/:id/delete", bannerHandler.DeleteBanner, middlewares.JWTMiddleware(rdb))
 }

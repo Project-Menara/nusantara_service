@@ -47,8 +47,7 @@ func (c *cloudinaryServiceImpl) UploadImage(ctx context.Context, file *multipart
 	defer src.Close()
 
 	uploadResult, err := c.cld.Upload.Upload(ctx, src, uploader.UploadParams{
-		Folder:         folder,
-		Transformation: "w_200,h_300,c_fill,g_face",
+		Folder: folder,
 	})
 
 	if err != nil {
@@ -61,7 +60,11 @@ func (c *cloudinaryServiceImpl) UploadImage(ctx context.Context, file *multipart
 
 // DestroyImage implements CloudinaryService.
 func (c *cloudinaryServiceImpl) DestroyImage(ctx context.Context, publicID string) error {
-	_, err := c.cld.Upload.Destroy(ctx, uploader.DestroyParams{PublicID: publicID})
+	invalidate := true
+	_, err := c.cld.Upload.Destroy(ctx, uploader.DestroyParams{
+		PublicID:   publicID,
+		Invalidate: &invalidate,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to delete image from cloudinary: %w", err)
 	}
