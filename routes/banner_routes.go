@@ -22,4 +22,7 @@ func BannerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinary *clo
 	e.GET("/:id", bannerHandler.GetByIdBanner, middlewares.JWTMiddleware(rdb))
 	e.PUT("/:id/edit", bannerHandler.UpdateBanner, middlewares.JWTMiddleware(rdb))
 	e.DELETE("/:id/delete", bannerHandler.DeleteBanner, middlewares.JWTMiddleware(rdb))
+	e.PUT("/:id/edit-status", bannerHandler.UpdateStatusBanner, middlewares.JWTMiddleware(rdb))
+
+	e.GET("/customer", bannerHandler.GetAllBannerCustomer)
 }

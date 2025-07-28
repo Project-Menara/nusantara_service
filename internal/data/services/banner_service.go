@@ -15,4 +15,7 @@ type BannerService interface {
 	GetByIdBanner(ctx context.Context, id uuid.UUID) (*entities.BannerEntity, error)
 	UpdateBanner(ctx context.Context, userId string, id uuid.UUID, req dto.UpdateBannerRequest, image *multipart.FileHeader) (*entities.BannerEntity, error)
 	DeleteBanner(ctx context.Context, id uuid.UUID) error
+	UpdateStatusBanner(ctx context.Context, bannerId string, req dto.UpdateStatusBannerRequest) error
+
+	GetAllBannerCustomer(ctx context.Context) ([]*entities.BannerEntity, error)
 }

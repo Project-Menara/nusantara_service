@@ -110,3 +110,19 @@ func (u *BannerRepositoryImpl) FindByUserIDSuperAdmin(ctx context.Context, userI
 	return &user, nil
 
 }
+
+// UpdateStatus implements repositories.BannerRepository.
+func (b *BannerRepositoryImpl) UpdateStatus(ctx context.Context, bannerId string, status int) error {
+	return b.db.WithContext(ctx).Model(&entities.BannerEntity{}).
+		Where("id = ?", bannerId).
+		Update("status", status).Error
+}
+
+// GetAllCustomer implements repositories.BannerRepository.
+func (b *BannerRepositoryImpl) GetAllBannerCustomer(ctx context.Context) ([]*entities.BannerEntity, error) {
+	var banners []*entities.BannerEntity
+	if err := b.db.WithContext(ctx).Where("status = 1").Find(&banners).Error; err != nil {
+		return nil, err
+	}
+	return banners, nil
+}

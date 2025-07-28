@@ -10,3 +10,7 @@ type UpdateBannerRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
+
+type UpdateStatusBannerRequest struct {
+	Status int `json:"status"`
+}

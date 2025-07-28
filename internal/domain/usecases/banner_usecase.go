@@ -270,3 +270,42 @@ func (b *BannerService) InvalidateBannerCache(ctx context.Context) {
 		b.rdb.Del(ctx, iterID.Val())
 	}
 }
+
+// UpdateStatusBanner implements services.BannerService.
+func (b *BannerService) UpdateStatusBanner(ctx context.Context, bannerId string, req dto.UpdateStatusBannerRequest) error {
+	uuID, err := uuid.Parse(bannerId)
+	if err != nil {
+		return err
+	}
+	banner, err := b.repo.FindById(ctx, uuID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "banner not found", 404)
+		}
+		return err
+	}
+	if req.Status < 0 || req.Status > 1 {
+		return response.NewCustomError(response.ErrBadRequest, "Status must be 0 or 1", 400)
+	}
+
+	banner.Status = req.Status
+
+	err = b.repo.UpdateStatus(ctx, bannerId, req.Status)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "Failed to update status banner", 500)
+	}
+
+	b.InvalidateBannerCache(ctx)
+
+	return nil
+}
+
+// GetAllBannerCustomer implements services.BannerService.
+func (b *BannerService) GetAllBannerCustomer(ctx context.Context) ([]*entities.BannerEntity, error) {
+	banners, err := b.repo.GetAllBannerCustomer(ctx)
+	if err != nil {
+		return nil, response.NewCustomError(response.ErrInternal, "Failed to get banner", 500)
+	}
+
+	return banners, nil
+}

@@ -148,3 +148,36 @@ func (b *BannerHandler) DeleteBanner(c echo.Context) error {
 	return response.Success(c, http.StatusOK, "Deleted Success", nil)
 
 }
+
+func (b *BannerHandler) UpdateStatusBanner(c echo.Context) error {
+	bannerId, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
+	}
+
+	var req dto.UpdateStatusBannerRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "Failed to bind request", err.Error())
+	}
+
+	if err := b.BannerService.UpdateStatusBanner(c.Request().Context(), bannerId.String(), req); err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update status banner")
+	}
+
+	return response.Success(c, http.StatusOK, "Update Status Banner Success", nil)
+}
+
+func (b *BannerHandler) GetAllBannerCustomer(c echo.Context) error {
+	banners, err := b.BannerService.GetAllBannerCustomer(c.Request().Context())
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update status banner")
+	}
+
+	return response.Success(c, http.StatusOK, "Get All Banner Success", banners)
+}
