@@ -6,11 +6,12 @@ import (
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/dto"
 	"nusantara_service/internal/response"
+	"time"
 )
 
 type CustomerService interface {
 	CheckPhone(ctx context.Context, req dto.CheckPhoneRequest) (*response.CheckPhoneResult, error)
-	RegisterCustomer(ctx context.Context, req dto.RegisterCustomerRequest) (*entities.UserEntity, error)
+	RegisterCustomer(ctx context.Context, req dto.RegisterCustomerRequest) (*entities.UserEntity, time.Duration, error)
 	ResendCodeOTPVerify(ctx context.Context, req dto.ResendOTPRequest) error
 	VerifyCodeOTP(ctx context.Context, req dto.VerifyOTPRequest) error
 	NewPinCustomer(ctx context.Context, req dto.NewPinRequest) error

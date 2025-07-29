@@ -49,7 +49,7 @@ func (h *CustomerHandler) RegisterCustomer(c echo.Context) error {
 		return response.Error(c, http.StatusBadRequest, "invalid request", err.Error())
 	}
 
-	data, err := h.CustomerService.RegisterCustomer(c.Request().Context(), req)
+	data, ttl, err := h.CustomerService.RegisterCustomer(c.Request().Context(), req)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
@@ -61,7 +61,10 @@ func (h *CustomerHandler) RegisterCustomer(c echo.Context) error {
 		return response.Error(c, http.StatusBadRequest, "Internal Server Error", nil)
 	}
 
-	return response.Success(c, http.StatusCreated, "customer registered", data)
+	return response.Success(c, http.StatusCreated, "customer registered", map[string]interface{}{
+		"user": data,
+		"ttl":  ttl,
+	})
 }
 
 func (h *CustomerHandler) ResendCodeOTPVerify(c echo.Context) error {

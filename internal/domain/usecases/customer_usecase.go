@@ -109,44 +109,44 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 	}, nil
 }
 
-func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.RegisterCustomerRequest) (*entities.UserEntity, error) {
+func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.RegisterCustomerRequest) (*entities.UserEntity, time.Duration, error) {
 	if strings.TrimSpace(req.Name) == "" {
-		return nil, response.NewCustomError(response.ErrBadRequest, "name is required", 400)
+		return nil, 0, response.NewCustomError(response.ErrBadRequest, "name is required", 400)
 	}
 	if strings.TrimSpace(req.Username) == "" {
-		return nil, response.NewCustomError(response.ErrBadRequest, "username is required", 400)
+		return nil, 0, response.NewCustomError(response.ErrBadRequest, "username is required", 400)
 	}
 	if strings.TrimSpace(req.Email) == "" {
-		return nil, response.NewCustomError(response.ErrBadRequest, "email is required", 400)
+		return nil, 0, response.NewCustomError(response.ErrBadRequest, "email is required", 400)
 	}
 	if strings.TrimSpace(req.Phone) == "" {
-		return nil, response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
+		return nil, 0, response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
 	}
 	if strings.TrimSpace(req.Gender) == "" {
-		return nil, response.NewCustomError(response.ErrBadRequest, "gender is required", 400)
+		return nil, 0, response.NewCustomError(response.ErrBadRequest, "gender is required", 400)
 	}
 
 	normalizedPhone := utils.NormalizePhone(req.Phone)
 
 	role, err := u.repo.FindRoleByName(ctx, "customer")
 	if err != nil {
-		return nil, response.NewCustomError(response.ErrNotFound, "failed to find role for customer", 404)
+		return nil, 0, response.NewCustomError(response.ErrNotFound, "failed to find role for customer", 404)
 	}
 
 	if user, _ := u.repo.FindByUsername(ctx, req.Username); user != nil {
-		return nil, response.NewCustomError(response.ErrExists, "username already exists", 409)
+		return nil, 0, response.NewCustomError(response.ErrExists, "username already exists", 409)
 	}
 
 	if user, _ := u.repo.FindByEmail(ctx, req.Email); user != nil {
-		return nil, response.NewCustomError(response.ErrExists, "email already exists", 409)
+		return nil, 0, response.NewCustomError(response.ErrExists, "email already exists", 409)
 	}
 
 	if user, _ := u.repo.FindByPhone(ctx, normalizedPhone); user != nil {
-		return nil, response.NewCustomError(response.ErrExists, "phone already exists", 409)
+		return nil, 0, response.NewCustomError(response.ErrExists, "phone already exists", 409)
 	}
 
 	if !strings.HasSuffix(strings.ToLower(req.Email), "@gmail.com") {
-		return nil, response.NewCustomError(response.ErrBadRequest, "only Gmail addresses are allowed", 400)
+		return nil, 0, response.NewCustomError(response.ErrBadRequest, "only Gmail addresses are allowed", 400)
 	}
 
 	newCustomer := &entities.UserEntity{
@@ -162,7 +162,7 @@ func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.Register
 
 	createdCustomer, err := u.repo.CreateCustomer(ctx, newCustomer)
 	if err != nil {
-		return nil, response.NewCustomError(response.ErrInternal, "failed to create customer", 500)
+		return nil, 0, response.NewCustomError(response.ErrInternal, "failed to create customer", 500)
 	}
 
 	otpCode := otp.GenerateOTP(6)
@@ -170,15 +170,20 @@ func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.Register
 
 	err = configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
 	if err != nil {
-		return nil, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
+		return nil, 0, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
 	}
 
 	err = twilio.SendWhatsAppOTP(normalizedPhone, otpCode)
 	if err != nil {
-		return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+		return nil, 0, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
 	}
 
-	return createdCustomer, nil
+	ttl, err := u.rdb.TTL(ctx, redisKey).Result()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return createdCustomer, time.Duration(ttl.Seconds()), nil
 }
 
 func (u *CustomerService) ResendCodeOTPVerify(ctx context.Context, req dto.ResendOTPRequest) error {
