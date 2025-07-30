@@ -51,10 +51,17 @@ func (b *BannerRepositoryImpl) Create(ctx context.Context, banner *entities.Bann
 // FindAll implements repositories.BannerRepository.
 func (b *BannerRepositoryImpl) FindAll(ctx context.Context, limit int, offset int) ([]*entities.BannerEntity, error) {
 	var banners []*entities.BannerEntity
-	if err := b.db.WithContext(ctx).Preload("User").Preload("User.Role").Limit(limit).Offset(offset).Find(&banners).Error; err != nil {
+	err := b.db.WithContext(ctx).
+		Order("updated_at DESC"). // Urut dari yang terbaru
+		Preload("User").
+		Preload("User.Role").
+		Limit(limit).
+		Offset(offset).
+		Find(&banners).Error
+
+	if err != nil {
 		return nil, err
 	}
-
 	return banners, nil
 }
 
