@@ -76,10 +76,16 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 		if err != nil {
 			return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
 		}
+
+		ttl, err := u.rdb.TTL(ctx, redisKey).Result()
+		if err != nil {
+			return nil, err
+		}
 		// Belum verifikasi OTP
 		return &response.CheckPhoneResult{
 			Action: "verify_otp",
 			User:   user,
+			Ttl:    &ttl,
 		}, nil
 	}
 
@@ -96,9 +102,14 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 		if err != nil {
 			return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
 		}
+		ttl, err := u.rdb.TTL(ctx, redisKey).Result()
+		if err != nil {
+			return nil, err
+		}
 		return &response.CheckPhoneResult{
 			Action: "verify_otp_and_create_pin",
 			User:   user,
+			Ttl:    &ttl,
 		}, nil
 	}
 

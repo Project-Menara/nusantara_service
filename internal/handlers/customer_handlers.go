@@ -10,6 +10,7 @@ import (
 	"nusantara_service/internal/dto"
 	"nusantara_service/internal/response"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
@@ -40,6 +41,7 @@ func (h *CustomerHandler) CheckPhoneCustomer(c echo.Context) error {
 	return response.Success(c, http.StatusOK, "Phone check result", map[string]interface{}{
 		"action": result.Action,
 		"user":   result.User,
+		"ttl":    time.Duration(result.Ttl.Seconds()),
 	})
 }
 
