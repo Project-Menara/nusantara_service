@@ -11,5 +11,6 @@ func RunMigrations(db *gorm.DB) error {
 		&model.Role{},
 		&model.User{},
 		&model.Banner{},
+		&model.TypeProduct{},
 	)
 }

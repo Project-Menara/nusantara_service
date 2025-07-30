@@ -309,3 +309,29 @@ func (b *BannerService) GetAllBannerCustomer(ctx context.Context) ([]*entities.B
 
 	return banners, nil
 }
+
+// GetByIdBannerCustomer implements services.BannerService.
+func (b *BannerService) GetByIdBannerCustomer(ctx context.Context, id uuid.UUID) (*entities.BannerEntity, error) {
+	redisKey := fmt.Sprintf("banner_customer:%s", id.String())
+
+	cached, err := configs.GetRedis(ctx, redisKey)
+	if err == nil && cached != "" {
+		var banner entities.BannerEntity
+		if err := json.Unmarshal([]byte(cached), &banner); err != nil {
+			return &banner, nil
+		}
+	}
+
+	banner, err := b.repo.FindById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "Not Found banner", 404)
+		}
+		return nil, err
+	}
+
+	dataToCache, _ := json.Marshal(banner)
+	_ = configs.SetRedis(ctx, redisKey, dataToCache, time.Minute*30)
+
+	return banner, nil
+}

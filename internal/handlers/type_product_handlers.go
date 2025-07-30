@@ -13,15 +13,15 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-type BannerHandler struct {
-	BannerService services.BannerService
+type TypeProductHandler struct {
+	TypeProductService services.TypeProductService
 }
 
-func NewBannerHandler(service services.BannerService) *BannerHandler {
-	return &BannerHandler{BannerService: service}
+func NewTypeProductHandler(service services.TypeProductService) *TypeProductHandler {
+	return &TypeProductHandler{TypeProductService: service}
 }
 
-func (b *BannerHandler) CreateBanner(c echo.Context) error {
+func (t *TypeProductHandler) CreateTypeProduct(c echo.Context) error {
 	userToken := c.Get("user")
 	if userToken == nil {
 		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
@@ -35,10 +35,8 @@ func (b *BannerHandler) CreateBanner(c echo.Context) error {
 	claims := user.Claims.(jwt.MapClaims)
 	superAdminID := claims["user_id"].(string)
 
-	// Manual parsing form-data fields
-	var req dto.CreateBannerRequest
+	var req dto.CreateTypeProductRequest
 	req.Name = c.FormValue("name")
-	req.Description = c.FormValue("description")
 	status := c.FormValue("status")
 	statusInt, err := strconv.Atoi(status)
 	if err != nil {
@@ -46,14 +44,12 @@ func (b *BannerHandler) CreateBanner(c echo.Context) error {
 	}
 	req.Status = statusInt
 
-	// Get image
 	imageFile, err := c.FormFile("image")
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "failed to get photo file", err.Error())
 	}
 
-	// Call service
-	newBanner, err := b.BannerService.CreateBanner(c.Request().Context(), superAdminID, req, imageFile)
+	newTypeProduct, err := t.TypeProductService.CreateTypeProduct(c.Request().Context(), superAdminID, req, imageFile)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
@@ -61,13 +57,13 @@ func (b *BannerHandler) CreateBanner(c echo.Context) error {
 		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
 	}
 
-	return response.Success(c, http.StatusCreated, "Create Banner Success", newBanner)
+	return response.Success(c, http.StatusOK, "Create Type Product Success", newTypeProduct)
 }
 
-func (b *BannerHandler) GetAllBanner(c echo.Context) error {
+func (t *TypeProductHandler) GetAllTypeProduct(c echo.Context) error {
 	pageInt, limtiInt := utils.ParsePaginationParams(c, 10)
 
-	banners, total, err := b.BannerService.GetAllBanner(c.Request().Context(), pageInt, limtiInt)
+	typeProduct, total, err := t.TypeProductService.GetAllTypeProduct(c.Request().Context(), pageInt, limtiInt)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
@@ -77,16 +73,17 @@ func (b *BannerHandler) GetAllBanner(c echo.Context) error {
 
 	meta := utils.BuildPaginationMeta(c, pageInt, limtiInt, total)
 
-	return response.PaginatedSuccess(c, 200, "Get All Banner Success", banners, meta)
+	return response.PaginatedSuccess(c, 200, "Get All Type Product Success", typeProduct, meta)
+
 }
 
-func (b *BannerHandler) GetByIdBanner(c echo.Context) error {
-	bannerId, err := uuid.Parse(c.Param("id"))
+func (t *TypeProductHandler) GetByIdTypeProduct(c echo.Context) error {
+	typeProductId, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
 	}
 
-	banner, err := b.BannerService.GetByIdBanner(c.Request().Context(), bannerId)
+	typeProduct, err := t.TypeProductService.GetByIdTypeProduct(c.Request().Context(), typeProductId)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
@@ -94,10 +91,10 @@ func (b *BannerHandler) GetByIdBanner(c echo.Context) error {
 		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
 	}
 
-	return response.Success(c, http.StatusOK, "Get Banner Success", banner)
+	return response.Success(c, http.StatusOK, "Get Type Product Success", typeProduct)
 }
 
-func (b *BannerHandler) UpdateBanner(c echo.Context) error {
+func (t *TypeProductHandler) UpdateTypeProduct(c echo.Context) error {
 	userToken := c.Get("user")
 	if userToken == nil {
 		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
@@ -111,17 +108,16 @@ func (b *BannerHandler) UpdateBanner(c echo.Context) error {
 	claims := user.Claims.(jwt.MapClaims)
 	superAdminID := claims["user_id"].(string)
 
-	bannerId, err := uuid.Parse(c.Param("id"))
+	typeProductId, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
 	}
 
-	var req dto.UpdateBannerRequest
+	var req dto.UpdateTypeProductRequest
 	req.Name = c.FormValue("name")
-	req.Description = c.FormValue("description")
 	imageFile, _ := c.FormFile("image")
 
-	updatedBanner, err := b.BannerService.UpdateBanner(c.Request().Context(), superAdminID, bannerId, req, imageFile)
+	updated, err := t.TypeProductService.UpdateTypeProduct(c.Request().Context(), superAdminID, typeProductId, req, imageFile)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
@@ -129,66 +125,66 @@ func (b *BannerHandler) UpdateBanner(c echo.Context) error {
 		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
 	}
 
-	return response.Success(c, http.StatusOK, "Updated Banner Success", updatedBanner)
+	return response.Success(c, http.StatusOK, "Upadated Type Product Success", updated)
 }
 
-func (b *BannerHandler) DeleteBanner(c echo.Context) error {
-	bannerId, err := uuid.Parse(c.Param("id"))
+func (t *TypeProductHandler) DeleteTypeProduct(c echo.Context) error {
+	typeProductId, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
 	}
 
-	if err := b.BannerService.DeleteBanner(c.Request().Context(), bannerId); err != nil {
+	if err := t.TypeProductService.DeleteTypeProduct(c.Request().Context(), typeProductId); err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create type product")
 	}
 
 	return response.Success(c, http.StatusOK, "Deleted Success", nil)
 
 }
 
-func (b *BannerHandler) UpdateStatusBanner(c echo.Context) error {
-	bannerId, err := uuid.Parse(c.Param("id"))
+func (t *TypeProductHandler) UpdateStatusTypeProduct(c echo.Context) error {
+	typeProductId, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
 	}
 
-	var req dto.UpdateStatusBannerRequest
+	var req dto.UpdateStatusTypeProductRequest
 	if err := c.Bind(&req); err != nil {
 		return response.Error(c, http.StatusBadRequest, "Failed to bind request", err.Error())
 	}
 
-	if err := b.BannerService.UpdateStatusBanner(c.Request().Context(), bannerId.String(), req); err != nil {
+	if err := t.TypeProductService.UpdateStatusTypeProduct(c.Request().Context(), typeProductId, req); err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update status banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update status type product")
 	}
 
-	return response.Success(c, http.StatusOK, "Update Status Banner Success", nil)
+	return response.Success(c, http.StatusOK, "Update Status Type Product Success", nil)
+
 }
 
-func (b *BannerHandler) GetAllBannerCustomer(c echo.Context) error {
-	banners, err := b.BannerService.GetAllBannerCustomer(c.Request().Context())
+func (t *TypeProductHandler) GetAllTypeProductCustomer(c echo.Context) error {
+	typeProduct, err := t.TypeProductService.GetAllTypeProductCustomer(c.Request().Context())
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to Get banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get type product")
 	}
-
-	return response.Success(c, http.StatusOK, "Get All Banner Success", banners)
+	return response.Success(c, http.StatusOK, "Get All Type Product Success", typeProduct)
 }
 
-func (b *BannerHandler) GetByIdBannerCustomer(c echo.Context) error {
-	bannerId, err := uuid.Parse(c.Param("id"))
+func (t *TypeProductHandler) GetByIdTypeProductCustomer(c echo.Context) error {
+	typeProductId, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
 	}
 
-	banner, err := b.BannerService.GetByIdBannerCustomer(c.Request().Context(), bannerId)
+	typeProduct, err := t.TypeProductService.GetByIdTypeProductCustomer(c.Request().Context(), typeProductId)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
@@ -196,5 +192,5 @@ func (b *BannerHandler) GetByIdBannerCustomer(c echo.Context) error {
 		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get type product")
 	}
 
-	return response.Success(c, http.StatusOK, "Get Banner Success", banner)
+	return response.Success(c, http.StatusOK, "Get Type Product Success", typeProduct)
 }
