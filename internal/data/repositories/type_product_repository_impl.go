@@ -51,7 +51,7 @@ func (t *TypeProductRepositoryImpl) Create(ctx context.Context, typeProduct *ent
 // FindAll implements repositories.TypeProductRepository.
 func (t *TypeProductRepositoryImpl) FindAll(ctx context.Context, limit int, offset int) ([]*entities.TypeProductEntity, error) {
 	var typeProducts []*entities.TypeProductEntity
-	if err := t.db.WithContext(ctx).Preload("User").Preload("User.Role").Limit(limit).Offset(offset).Find(&typeProducts).Error; err != nil {
+	if err := t.db.WithContext(ctx).Preload("User").Preload("User.Role").Order("created_at DESC").Limit(limit).Offset(offset).Find(&typeProducts).Error; err != nil {
 		return nil, err
 	}
 

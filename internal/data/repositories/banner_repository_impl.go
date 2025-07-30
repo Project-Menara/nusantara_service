@@ -52,9 +52,9 @@ func (b *BannerRepositoryImpl) Create(ctx context.Context, banner *entities.Bann
 func (b *BannerRepositoryImpl) FindAll(ctx context.Context, limit int, offset int) ([]*entities.BannerEntity, error) {
 	var banners []*entities.BannerEntity
 	err := b.db.WithContext(ctx).
-		Order("updated_at DESC"). // Urut dari yang terbaru
 		Preload("User").
 		Preload("User.Role").
+		Order("created_at DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&banners).Error
