@@ -74,7 +74,7 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 
 		err = twilio.SendWhatsAppOTP(normalized, otpCode)
 		if err != nil {
-			return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+			return nil, response.NewCustomError(response.ErrInternal, err.Error(), 500)
 		}
 
 		ttl, err := u.rdb.TTL(ctx, redisKey).Result()
