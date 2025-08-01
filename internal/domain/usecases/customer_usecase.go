@@ -871,7 +871,7 @@ func (u *CustomerService) FogotPIN(ctx context.Context, req dto.ForgotPINRequest
 
 	normalized := utils.NormalizePhone(req.Phone)
 
-	deepLink := fmt.Sprintf("https://nusantara-oleh-oleh.com/home?token=%s", token)
+	deepLink := fmt.Sprintf("https://nusantara-oleh-oleh.com/reset-pin?token=%s", token)
 
 	message := fmt.Sprintf("Klik link berikut untuk reset PIN: \n%s", deepLink)
 	err = twilio.SendWhatsAppLink(normalized, message)
