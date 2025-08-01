@@ -32,4 +32,8 @@ func CustomerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinarySvc
 	e.PUT("/confirm-new-pin-customer", custHandler.ConfirmationPINCustomer, middlewares.JWTMiddleware(rdb))
 	e.POST("/new-phone-customer", custHandler.NewPhoneCustomer, middlewares.JWTMiddleware(rdb))
 	e.PUT("/verify-otp-customer", custHandler.VerifyCodeOTPCustomerUpdate, middlewares.JWTMiddleware(rdb))
+	e.POST("/forgot-pin", custHandler.ForgotPINCustomer)
+	e.GET("/validate-forgot-pin", custHandler.ValidateTokenForgotPINCustomer)
+	e.POST("/new-pin-forgot", custHandler.NewPINCustomerForgotPIN)
+	e.POST("/confirm-pin-forgot", custHandler.ConfirmationPINCustomerForgotPIN)
 }

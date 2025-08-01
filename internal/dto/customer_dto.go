@@ -43,3 +43,17 @@ type VerifyOTPCustomerUpdateRequest struct {
 	Phone string `json:"phone"`
 	Code  string `json:"code"`
 }
+
+type ForgotPINRequest struct {
+	Phone string `json:"phone"`
+}
+
+type CreateNewPinRequest struct {
+	Phone string `json:"phone"`
+	PIN   string `json:"pin"`
+}
+
+type CreateConfirmPinRequest struct {
+	Phone      string `json:"phone"`
+	ConfirmPIN string `json:"confirm_pin"`
+}

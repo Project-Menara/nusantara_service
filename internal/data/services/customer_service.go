@@ -21,6 +21,10 @@ type CustomerService interface {
 	LogoutCustomer(ctx context.Context, userId, token string) error
 	LoginCustomer(ctx context.Context, req dto.LoginCustomerRequest) (string, error)
 	UpdateProfileCustomer(ctx context.Context, userId string, req dto.UpdateCustomerRequest, photoFileHeader *multipart.FileHeader) (*entities.UserEntity, error)
+	FogotPIN(ctx context.Context, req dto.ForgotPINRequest) (string, error)
+	ValidateTokenForgotPIN(ctx context.Context, token string) (string, error)
+	CreateNewPIN(ctx context.Context, token string, req dto.CreateNewPinRequest) error
+	CreateNewConfirmPIN(ctx context.Context, tokenPIN string, req dto.CreateConfirmPinRequest) (*entities.UserEntity, string, error)
 
 	//Change Phone
 	VerifyPINCustomer(ctx context.Context, userId string, req dto.VerifyPINCustomerRequest) error

@@ -43,3 +43,39 @@ func SendWhatsAppOTP(to string, otp string) error {
 	}
 	return fmt.Errorf("failed to send WhatsApp message: %s", string(body))
 }
+
+func SendWhatsAppLink(to string, message string) error {
+	from := os.Getenv("TWILIO_PHONE_NUMBER")
+	sid := os.Getenv("TWILIO_ACCOUNT_SID")
+	token := os.Getenv("TWILIO_AUTH_TOKEN")
+
+	msgData := url.Values{}
+	msgData.Set("To", "whatsapp:"+to)
+	msgData.Set("From", "whatsapp:"+from)
+	msgData.Set("Body", message)
+	msgDataReader := *strings.NewReader(msgData.Encode())
+
+	urlStr := fmt.Sprintf("https://api.twilio.com/2010-04-01/Accounts/%s/Messages.json", sid)
+	req, err := http.NewRequest("POST", urlStr, &msgDataReader)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.SetBasicAuth(sid, token)
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return nil
+	}
+
+	return fmt.Errorf("failed to send WhatsApp message: %s", string(body))
+}

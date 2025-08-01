@@ -852,3 +852,140 @@ func (u *CustomerService) VerifyCodeOTPCustomerUpdate(ctx context.Context, userI
 
 	return data, nil
 }
+
+func (u *CustomerService) FogotPIN(ctx context.Context, req dto.ForgotPINRequest) (string, error) {
+	if strings.TrimSpace(req.Phone) == "" {
+		return "", response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
+	}
+
+	user, err := u.repo.FindByPhoneCustomer(ctx, req.Phone)
+	if err != nil {
+		return "", response.NewCustomError(response.ErrNotFound, "user not found", 500)
+	}
+
+	token := uuid.NewString()
+	err = configs.SetRedis(ctx, "reset_pin:"+token, user.Phone, time.Minute*2)
+	if err != nil {
+		return "", response.NewCustomError(response.ErrInternal, "failed to store token", 404)
+	}
+
+	normalized := utils.NormalizePhone(req.Phone)
+
+	deepLink := fmt.Sprintf("https://nusantara-oleh-oleh.com/home?token=%s", token)
+
+	message := fmt.Sprintf("Klik link berikut untuk reset PIN: \n%s", deepLink)
+	err = twilio.SendWhatsAppLink(normalized, message)
+	if err != nil {
+		return "", response.NewCustomError(response.ErrInternal, "failed to send message link", 500)
+	}
+
+	return token, nil
+}
+
+// ValidateTokenForgotPIN implements services.CustomerService.
+func (u *CustomerService) ValidateTokenForgotPIN(ctx context.Context, token string) (string, error) {
+	if strings.TrimSpace(token) == "" {
+		return "", response.NewCustomError(response.ErrBadRequest, "token is required", 400)
+	}
+
+	redisKey := "reset_pin:" + token
+	phone, err := configs.GetRedis(ctx, redisKey)
+	if err != nil {
+		return "", response.NewCustomError(response.ErrUnauthorized, "invalid or expired token", 401)
+	}
+
+	return phone, nil
+}
+
+// CreateNewPIN implements services.CustomerService.
+func (u *CustomerService) CreateNewPIN(ctx context.Context, token string, req dto.CreateNewPinRequest) error {
+	newPin := strings.TrimSpace(req.PIN)
+	phone := strings.TrimSpace(req.Phone)
+
+	if newPin == "" {
+		return response.NewCustomError(response.ErrBadRequest, "pin is required", 400)
+	}
+	if phone == "" {
+		return response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
+	}
+
+	if len(newPin) != 6 {
+		return response.NewCustomError(response.ErrBadRequest, "PIN must be 6 digits", 400)
+	}
+
+	user, err := u.repo.FindByPhoneCustomer(ctx, req.Phone)
+	if err != nil {
+		return response.NewCustomError(response.ErrNotFound, "user not found", 500)
+	}
+
+	isOldPin := utils.CheckPasswordHash(req.PIN, user.Password)
+	if isOldPin {
+		return response.NewCustomError(response.ErrBadRequest, "You've input the old pin. Please input a new pin", 500)
+	}
+
+	normalize := utils.NormalizePhone(phone)
+	redisKey := fmt.Sprintf("new_pin_forgot:%s", normalize)
+
+	err = configs.SetRedis(ctx, redisKey, newPin, time.Minute*15)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to save pin", 500)
+	}
+
+	return nil
+}
+
+// CreateNewConfirmPIN implements services.CustomerService.
+func (u *CustomerService) CreateNewConfirmPIN(ctx context.Context, tokenPIN string, req dto.CreateConfirmPinRequest) (*entities.UserEntity, string, error) {
+	confirmPin := strings.TrimSpace(req.ConfirmPIN)
+	phone := strings.TrimSpace(req.Phone)
+
+	if confirmPin == "" {
+		return nil, "", response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
+	}
+	if phone == "" {
+		return nil, "", response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
+	}
+	normalize := utils.NormalizePhone(phone)
+	redisKey := fmt.Sprintf("new_pin_forgot:%s", normalize)
+
+	storedPIN, err := configs.GetRedis(ctx, redisKey)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrUnauthorized, "PIN expired or not set", 401)
+	}
+
+	if storedPIN != confirmPin {
+		return nil, "", response.NewCustomError(response.ErrUnauthorized, "PIN doesn't match", 401)
+	}
+
+	user, err := u.repo.FindByPhoneCustomer(ctx, normalize)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, "", response.NewCustomError(response.ErrNotFound, "user not found", 404)
+		}
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to get user", 500)
+	}
+
+	hashedPin, err := utils.HashPassword(confirmPin)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to hash pin", 500)
+	}
+
+	err = u.repo.UpdatePinCustomer(ctx, user.ID, hashedPin)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to save pin", 500)
+	}
+
+	_ = configs.DeleteRedis(ctx, redisKey)
+
+	token, err := utils.GenerateToken(user.ID, user.Role.Name)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to generate token", 500)
+	}
+
+	redisTokenKey := fmt.Sprintf("customer_token:%s", user.ID)
+	err = configs.SetRedis(ctx, redisTokenKey, token, 30*time.Minute)
+	if err != nil {
+		return nil, "", response.NewCustomError(response.ErrInternal, "failed to store session", 500)
+	}
+	return user, token, nil
+}

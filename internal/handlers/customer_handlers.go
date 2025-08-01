@@ -461,3 +461,90 @@ func (h *CustomerHandler) VerifyCodeOTPCustomerUpdate(c echo.Context) error {
 
 	return response.Success(c, http.StatusOK, "Phone Updated Success", customer)
 }
+
+func (h *CustomerHandler) ForgotPINCustomer(c echo.Context) error {
+	var req dto.ForgotPINRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalida request", err.Error())
+	}
+
+	token, err := h.CustomerService.FogotPIN(c.Request().Context(), req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "link reset pin sended via wa", map[string]interface{}{
+		"token": token,
+	})
+}
+
+func (h *CustomerHandler) ValidateTokenForgotPINCustomer(c echo.Context) error {
+	token := c.QueryParam("token")
+	result, err := h.CustomerService.ValidateTokenForgotPIN(c.Request().Context(), token)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "token is valid", map[string]interface{}{
+		"phone": result,
+	})
+}
+
+func (h *CustomerHandler) NewPINCustomerForgotPIN(c echo.Context) error {
+	token := c.QueryParam("token")
+	_, err := h.CustomerService.ValidateTokenForgotPIN(c.Request().Context(), token)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+	var req dto.CreateNewPinRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request", 400)
+	}
+
+	if err := h.CustomerService.CreateNewPIN(c.Request().Context(), token, req); err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "next to confirmation pin", nil)
+
+}
+
+func (h *CustomerHandler) ConfirmationPINCustomerForgotPIN(c echo.Context) error {
+	tokenPIN := c.QueryParam("token")
+	_, err := h.CustomerService.ValidateTokenForgotPIN(c.Request().Context(), tokenPIN)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+	var req dto.CreateConfirmPinRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid request", 400)
+	}
+
+	user, token, err := h.CustomerService.CreateNewConfirmPIN(c.Request().Context(), tokenPIN, req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "confirmation pin mathcing. Update pin successfully", map[string]interface{}{
+		"token": token,
+		"user":  user,
+	})
+}
