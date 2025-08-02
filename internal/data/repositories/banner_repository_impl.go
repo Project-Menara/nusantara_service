@@ -137,7 +137,7 @@ func (b *BannerRepositoryImpl) GetAllBannerCustomer(ctx context.Context) ([]*ent
 // CountAllWithSearch implements repositories.BannerRepository.
 func (b *BannerRepositoryImpl) CountAllWithSearch(ctx context.Context, search string) (int, error) {
 	var count int64
-	query := b.db.WithContext(ctx).Table("banners")
+	query := b.db.WithContext(ctx).Table("banners").Where("deleted_at IS NULL")
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
@@ -153,7 +153,7 @@ func (b *BannerRepositoryImpl) CountAllWithSearch(ctx context.Context, search st
 func (b *BannerRepositoryImpl) FindAllWithSearch(ctx context.Context, limit int, offset int, search string) ([]*entities.BannerEntity, error) {
 	var banners []*entities.BannerEntity
 
-	query := b.db.WithContext(ctx).Table("banners").Preload("User").Preload("User.Role").Order("created_at DESC").Limit(limit).Offset(offset)
+	query := b.db.WithContext(ctx).Table("banners").Preload("User").Preload("User.Role").Where("deleted_at IS NULL").Order("created_at DESC").Limit(limit).Offset(offset)
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}

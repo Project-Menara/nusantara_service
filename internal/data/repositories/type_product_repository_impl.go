@@ -137,7 +137,7 @@ func (t *TypeProductRepositoryImpl) GetByIdTypeProductCustomer(ctx context.Conte
 // CountAllWithSearch implements repositories.TypeProductRepository.
 func (t *TypeProductRepositoryImpl) CountAllWithSearch(ctx context.Context, search string) (int, error) {
 	var count int64
-	query := t.db.WithContext(ctx).Table("type_products")
+	query := t.db.WithContext(ctx).Table("type_products").Where("deleted_at IS NULL")
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
@@ -153,7 +153,7 @@ func (t *TypeProductRepositoryImpl) CountAllWithSearch(ctx context.Context, sear
 func (t *TypeProductRepositoryImpl) FindAllWithSearch(ctx context.Context, limit int, offset int, search string) ([]*entities.TypeProductEntity, error) {
 	var typeProduct []*entities.TypeProductEntity
 
-	query := t.db.WithContext(ctx).Table("type_products").Preload("User").Preload("User.Role").Order("created_at DESC").Limit(limit).Offset(offset)
+	query := t.db.WithContext(ctx).Table("type_products").Preload("User").Preload("User.Role").Where("deleted_at IS NULL").Order("created_at DESC").Limit(limit).Offset(offset)
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
