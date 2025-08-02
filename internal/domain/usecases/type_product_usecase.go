@@ -95,36 +95,48 @@ func (t *TypeProductService) CreateTypeProduct(ctx context.Context, userId strin
 }
 
 // GetAllTypeProduct implements services.TypeProductService.
-func (t *TypeProductService) GetAllTypeProduct(ctx context.Context, page int, limit int) ([]*entities.TypeProductEntity, int, error) {
-	offset := (page - 1) * limit
-	rediskey := fmt.Sprintf("type_products:page=%d&limit=%d", page, limit)
+func (t *TypeProductService) GetAllTypeProduct(ctx context.Context, page int, limit int, search string) ([]*entities.TypeProductEntity, int, error) {
+	cacheKey := fmt.Sprintf("type_products:search:%s:page:%d:limit:%d", search, page, limit)
+	cached, err := configs.GetRedis(ctx, cacheKey)
+	if err == nil {
+		var result struct {
+			Data  []*entities.TypeProductEntity `json:"data"`
+			Total int                           `json:"total"`
+		}
 
-	cached, err := configs.GetRedis(ctx, rediskey)
-	if err == nil && cached != "" {
-		var cachedData struct {
-			TypeProducts []*entities.TypeProductEntity `json:"type_products"`
-			Total        int                           `json:"total"`
-		}
-		if err := json.Unmarshal([]byte(cached), &cachedData); err != nil {
-			return cachedData.TypeProducts, cachedData.Total, nil
-		}
+		_ = json.Unmarshal([]byte(cached), &result)
+		return result.Data, result.Total, nil
 	}
 
-	typeProducts, err := t.repo.FindAll(ctx, limit, offset)
+	offset := (page - 1) * limit
+	// rediskey := fmt.Sprintf("type_products:page=%d&limit=%d", page, limit)
+
+	// cached, err := configs.GetRedis(ctx, rediskey)
+	// if err == nil && cached != "" {
+	// 	var cachedData struct {
+	// 		TypeProducts []*entities.TypeProductEntity `json:"type_products"`
+	// 		Total        int                           `json:"total"`
+	// 	}
+	// 	if err := json.Unmarshal([]byte(cached), &cachedData); err != nil {
+	// 		return cachedData.TypeProducts, cachedData.Total, nil
+	// 	}
+	// }
+
+	typeProducts, err := t.repo.FindAllWithSearch(ctx, limit, offset, search)
 	if err != nil {
 		return nil, 0, response.NewCustomError(response.ErrNotFound, "Type Product Not Found", 404)
 	}
 
-	total, err := t.repo.CountAll(ctx)
+	total, err := t.repo.CountAllWithSearch(ctx, search)
 	if err != nil {
 		return nil, 0, response.NewCustomError(response.ErrBadRequest, "failed to count type product", 400)
 	}
 	dataToCache, _ := json.Marshal(map[string]interface{}{
-		"type_products": typeProducts,
-		"total":         total,
+		"data":  typeProducts,
+		"total": total,
 	})
 
-	_ = configs.SetRedis(ctx, rediskey, dataToCache, time.Minute*30)
+	_ = configs.SetRedis(ctx, cacheKey, dataToCache, time.Minute*10)
 	return typeProducts, total, nil
 }
 

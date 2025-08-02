@@ -66,8 +66,9 @@ func (b *BannerHandler) CreateBanner(c echo.Context) error {
 
 func (b *BannerHandler) GetAllBanner(c echo.Context) error {
 	pageInt, limtiInt := utils.ParsePaginationParams(c, 10)
+	search := c.QueryParam("search")
 
-	banners, total, err := b.BannerService.GetAllBanner(c.Request().Context(), pageInt, limtiInt)
+	banners, total, err := b.BannerService.GetAllBanner(c.Request().Context(), pageInt, limtiInt, search)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())

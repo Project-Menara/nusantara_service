@@ -133,3 +133,34 @@ func (b *BannerRepositoryImpl) GetAllBannerCustomer(ctx context.Context) ([]*ent
 	}
 	return banners, nil
 }
+
+// CountAllWithSearch implements repositories.BannerRepository.
+func (b *BannerRepositoryImpl) CountAllWithSearch(ctx context.Context, search string) (int, error) {
+	var count int64
+	query := b.db.WithContext(ctx).Table("banners")
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+
+	if err := query.Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+// FindAllWithSearch implements repositories.BannerRepository.
+func (b *BannerRepositoryImpl) FindAllWithSearch(ctx context.Context, limit int, offset int, search string) ([]*entities.BannerEntity, error) {
+	var banners []*entities.BannerEntity
+
+	query := b.db.WithContext(ctx).Table("banners").Preload("User").Preload("User.Role").Order("created_at DESC").Limit(limit).Offset(offset)
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+
+	if err := query.Find(&banners).Error; err != nil {
+		return nil, err
+	}
+
+	return banners, nil
+}

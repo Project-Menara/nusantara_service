@@ -133,3 +133,34 @@ func (t *TypeProductRepositoryImpl) GetByIdTypeProductCustomer(ctx context.Conte
 
 	return &typeProduct, nil
 }
+
+// CountAllWithSearch implements repositories.TypeProductRepository.
+func (t *TypeProductRepositoryImpl) CountAllWithSearch(ctx context.Context, search string) (int, error) {
+	var count int64
+	query := t.db.WithContext(ctx).Table("type_products")
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+
+	if err := query.Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+// FindAllWithSearch implements repositories.TypeProductRepository.
+func (t *TypeProductRepositoryImpl) FindAllWithSearch(ctx context.Context, limit int, offset int, search string) ([]*entities.TypeProductEntity, error) {
+	var typeProduct []*entities.TypeProductEntity
+
+	query := t.db.WithContext(ctx).Table("type_products").Preload("User").Preload("User.Role").Order("created_at DESC").Limit(limit).Offset(offset)
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+
+	if err := query.Find(&typeProduct).Error; err != nil {
+		return nil, err
+	}
+
+	return typeProduct, nil
+}

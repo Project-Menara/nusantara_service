@@ -20,4 +20,7 @@ type TypeProductRepository interface {
 	FindByName(ctx context.Context, name string) (*entities.TypeProductEntity, error)
 	CountAll(ctx context.Context) (int, error)
 	FindByUserIDSuperAdmin(ctx context.Context, userID string) (*entities.UserEntity, error)
+
+	FindAllWithSearch(ctx context.Context, limit, offset int, search string) ([]*entities.TypeProductEntity, error)
+	CountAllWithSearch(ctx context.Context, search string) (int, error)
 }

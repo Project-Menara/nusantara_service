@@ -62,8 +62,9 @@ func (t *TypeProductHandler) CreateTypeProduct(c echo.Context) error {
 
 func (t *TypeProductHandler) GetAllTypeProduct(c echo.Context) error {
 	pageInt, limtiInt := utils.ParsePaginationParams(c, 10)
+	search := c.QueryParam("search")
 
-	typeProduct, total, err := t.TypeProductService.GetAllTypeProduct(c.Request().Context(), pageInt, limtiInt)
+	typeProduct, total, err := t.TypeProductService.GetAllTypeProduct(c.Request().Context(), pageInt, limtiInt, search)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())

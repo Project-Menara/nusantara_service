@@ -103,37 +103,49 @@ func (b *BannerService) CreateBanner(ctx context.Context, userId string, req dto
 }
 
 // GetAllBanner implements services.BannerService.
-func (b *BannerService) GetAllBanner(ctx context.Context, page int, limit int) ([]*entities.BannerEntity, int, error) {
-	offset := (page - 1) * limit
-	redisKey := fmt.Sprintf("banners:page=%d&limit=%d", page, limit)
+func (b *BannerService) GetAllBanner(ctx context.Context, page int, limit int, search string) ([]*entities.BannerEntity, int, error) {
+	cacheKey := fmt.Sprintf("banner:search:%s:page:%d:limit:%d", search, page, limit)
+	cached, err := configs.GetRedis(ctx, cacheKey)
+	if err == nil {
+		var result struct {
+			Data  []*entities.BannerEntity `json:"data"`
+			Total int                      `json:"total"`
+		}
 
-	// Cek apakah data ada di redis
-	cached, err := configs.GetRedis(ctx, redisKey)
-	if err == nil && cached != "" {
-		var cachedData struct {
-			Banners []*entities.BannerEntity `json:"banners"`
-			Total   int                      `json:"total"`
-		}
-		if err := json.Unmarshal([]byte(cached), &cachedData); err == nil {
-			return cachedData.Banners, cachedData.Total, nil
-		}
+		_ = json.Unmarshal([]byte(cached), &result)
+		return result.Data, result.Total, nil
 	}
 
-	banners, err := b.repo.FindAll(ctx, limit, offset)
+	offset := (page - 1) * limit
+	// redisKey := fmt.Sprintf("banners:page=%d&limit=%d", page, limit)
+
+	// Cek apakah data ada di redis
+	// cached, err := configs.GetRedis(ctx, redisKey)
+	// if err == nil && cached != "" {
+	// 	var cachedData struct {
+	// 		Banners []*entities.BannerEntity `json:"banners"`
+	// 		Total   int                      `json:"total"`
+	// 	}
+	// 	if err := json.Unmarshal([]byte(cached), &cachedData); err == nil {
+	// 		return cachedData.Banners, cachedData.Total, nil
+	// 	}
+	// }
+
+	banners, err := b.repo.FindAllWithSearch(ctx, limit, offset, search)
 	if err != nil {
 		return nil, 0, response.NewCustomError(response.ErrNotFound, "failed to find banner", 404)
 	}
 
-	total, err := b.repo.CountAll(ctx)
+	total, err := b.repo.CountAllWithSearch(ctx, search)
 	if err != nil {
 		return nil, 0, response.NewCustomError(response.ErrBadRequest, "failed to count banner", 400)
 	}
 	dataToCache, _ := json.Marshal(map[string]interface{}{
-		"banners": banners,
-		"total":   total,
+		"data":  banners,
+		"total": total,
 	})
 
-	_ = configs.SetRedis(ctx, redisKey, dataToCache, time.Minute*30)
+	_ = configs.SetRedis(ctx, cacheKey, dataToCache, time.Minute*10)
 
 	return banners, total, nil
 }
