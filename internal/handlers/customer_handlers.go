@@ -279,9 +279,6 @@ func (h *CustomerHandler) UpdateProfile(c echo.Context) error {
 
 	var photoFile *multipart.FileHeader
 	file, err := c.FormFile("photo")
-	if err != nil {
-		return response.Error(c, http.StatusBadRequest, "failed to get photo file", err.Error())
-	}
 	if file != nil {
 		photoFile = file
 	}
