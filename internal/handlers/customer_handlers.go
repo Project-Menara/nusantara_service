@@ -278,7 +278,7 @@ func (h *CustomerHandler) UpdateProfile(c echo.Context) error {
 	}
 
 	var photoFile *multipart.FileHeader
-	file, err := c.FormFile("photo")
+	file, _ := c.FormFile("photo")
 	if file != nil {
 		photoFile = file
 	}
