@@ -899,7 +899,7 @@ func (u *CustomerService) FogotPIN(ctx context.Context, req dto.ForgotPINRequest
 
 	message := fmt.Sprintf("Klik link berikut untuk reset PIN: \n%s\nBerlaku selama 15 menit", deepLink)
 
-	err = configs.SetRedis(ctx, "reset_pin:"+token, message, time.Minute*2)
+	err = configs.SetRedis(ctx, "reset_pin:"+token, message, time.Minute*15)
 	if err != nil {
 		return "", response.NewCustomError(response.ErrInternal, "failed to store token", 404)
 	}
