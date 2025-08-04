@@ -1,13 +1,20 @@
 package consumer
 
 import (
-	"encoding/json"
+	"encoding/json" // Import errors package
 	"log"
 	"nusantara_service/configs"
 	"nusantara_service/internal/data/dataSources/rabbitmq"
 	"nusantara_service/internal/data/dataSources/twilio" // Pastikan jalur ini benar
-	// Impor amqp untuk Ack/Nack
+	"strings"                                            // Import strings package
 )
+
+// Asumsi: Jika package twilio Anda tidak mengembalikan error yang terstruktur,
+// kita akan mencoba mencari substring error code di pesan error.
+// Cara yang lebih robust adalah dengan memodifikasi package twilio
+// untuk mengembalikan struct error kustom (contoh: twilio.Error)
+// yang berisi code dan message, sehingga bisa dicek langsung.
+const twilioRateLimitErrorCode = "63038"
 
 type OTPPayload struct {
 	Phone string `json:"phone"`
@@ -24,7 +31,6 @@ type LinkForgotPINPayload struct {
 }
 
 func ConsumeOTPQueue() {
-	// Pastikan antrean dideklarasikan di sisi konsumen juga, jika belum di deklarasi di produser
 	_, err := configs.RabbitChannel.QueueDeclare(
 		"otp_queue", // Nama antrean
 		true,        // Durable
@@ -54,14 +60,25 @@ func ConsumeOTPQueue() {
 		var payload OTPPayload
 		if err := json.Unmarshal(msg.Body, &payload); err != nil {
 			log.Printf("Error unmarshaling OTP message: %v. Message body: %s", err, msg.Body)
-			msg.Nack(false, false) // Nack pesan jika gagal unmarshal
+			msg.Nack(false, false) // Nack pesan tanpa requeue jika gagal unmarshal (pesan rusak)
 			continue
 		}
 
 		log.Printf("Received OTP message for phone: %s, code: %s", payload.Phone, payload.Code)
 		if err := twilio.SendWhatsAppOTP(payload.Phone, payload.Code); err != nil {
 			log.Printf("Failed to send OTP via WhatsApp for %s: %v", payload.Phone, err)
-			msg.Nack(false, true) // Nack dan requeue jika gagal kirim OTP
+
+			// Cek apakah error adalah karena rate limit Twilio
+			// Ini adalah asumsi, jika package twilio Anda mengembalikan struct error kustom,
+			// gunakan cara yang lebih spesifik untuk mengeceknya.
+			if strings.Contains(err.Error(), twilioRateLimitErrorCode) {
+				log.Printf("Twilio rate limit exceeded for %s. Nacking message without requeue.", payload.Phone)
+				msg.Nack(false, false) // Nack tanpa requeue jika Twilio limit
+			} else {
+				// Untuk error lain (misal, masalah koneksi sementara), Nack dengan requeue
+				log.Printf("Other error occurred for %s. Nacking message with requeue.", payload.Phone)
+				msg.Nack(false, true) // Nack dan requeue jika gagal kirim OTP (error transient)
+			}
 		} else {
 			log.Printf("OTP sent successfully to %s", payload.Phone)
 			msg.Ack(false) // Ack pesan setelah berhasil
@@ -70,7 +87,6 @@ func ConsumeOTPQueue() {
 }
 
 func ConsumeVerifiedQueue() {
-	// Pastikan antrean dideklarasikan di sisi konsumen juga
 	_, err := configs.RabbitChannel.QueueDeclare(
 		"verified_queue", // Nama antrean yang BENAR
 		true,             // Durable
@@ -100,7 +116,7 @@ func ConsumeVerifiedQueue() {
 		var payload VerifiedPayload
 		if err := json.Unmarshal(msg.Body, &payload); err != nil {
 			log.Printf("Error unmarshaling verified message: %v. Message body: %s", err, msg.Body)
-			msg.Nack(false, false) // Nack pesan jika gagal unmarshal
+			msg.Nack(false, false) // Nack pesan tanpa requeue jika gagal unmarshal
 			continue
 		}
 
@@ -108,7 +124,15 @@ func ConsumeVerifiedQueue() {
 		message := "Nomor kamu telah berhasil diverifikasi."
 		if err := twilio.SendWhatsAppMessage(payload.Phone, message); err != nil {
 			log.Printf("Failed to send verification message via WhatsApp for %s: %v", payload.Phone, err)
-			msg.Nack(false, true) // Nack dan requeue jika gagal kirim pesan verifikasi
+
+			// Cek apakah error adalah karena rate limit Twilio
+			if strings.Contains(err.Error(), twilioRateLimitErrorCode) {
+				log.Printf("Twilio rate limit exceeded for %s. Nacking message without requeue.", payload.Phone)
+				msg.Nack(false, false) // Nack tanpa requeue jika Twilio limit
+			} else {
+				log.Printf("Other error occurred for %s. Nacking message with requeue.", payload.Phone)
+				msg.Nack(false, true) // Nack dan requeue jika gagal kirim pesan verifikasi (error transient)
+			}
 		} else {
 			log.Printf("Verification message sent successfully to %s", payload.Phone)
 			msg.Ack(false) // Ack pesan setelah berhasil
@@ -117,7 +141,6 @@ func ConsumeVerifiedQueue() {
 }
 
 func ConsumeLinkForgotPINQueue() {
-	// Pastikan antrean dideklarasikan di sisi konsumen juga, jika belum di deklarasi di produser
 	_, err := configs.RabbitChannel.QueueDeclare(
 		rabbitmq.LinkForgotPINQueueName, // Nama antrean
 		true,                            // Durable
@@ -147,14 +170,22 @@ func ConsumeLinkForgotPINQueue() {
 		var payload LinkForgotPINPayload
 		if err := json.Unmarshal(msg.Body, &payload); err != nil {
 			log.Printf("Error unmarshaling link message: %v. Message body: %s", err, msg.Body)
-			msg.Nack(false, false) // Nack pesan jika gagal unmarshal
+			msg.Nack(false, false) // Nack pesan tanpa requeue jika gagal unmarshal
 			continue
 		}
 
 		log.Printf("Received link message for phone: %s, code: %s", payload.Phone, payload.Link)
 		if err := twilio.SendWhatsAppMessage(payload.Phone, payload.Link); err != nil {
 			log.Printf("Failed to send link via WhatsApp for %s: %v", payload.Phone, err)
-			msg.Nack(false, true) // Nack dan requeue jika gagal kirim OTP
+
+			// Cek apakah error adalah karena rate limit Twilio
+			if strings.Contains(err.Error(), twilioRateLimitErrorCode) {
+				log.Printf("Twilio rate limit exceeded for %s. Nacking message without requeue.", payload.Phone)
+				msg.Nack(false, false) // Nack tanpa requeue jika Twilio limit
+			} else {
+				log.Printf("Other error occurred for %s. Nacking message with requeue.", payload.Phone)
+				msg.Nack(false, true) // Nack dan requeue jika gagal kirim OTP (error transient)
+			}
 		} else {
 			log.Printf("Link sent successfully to %s", payload.Phone)
 			msg.Ack(false) // Ack pesan setelah berhasil

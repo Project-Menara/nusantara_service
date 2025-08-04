@@ -888,22 +888,22 @@ func (u *CustomerService) FogotPIN(ctx context.Context, req dto.ForgotPINRequest
 		return "", response.NewCustomError(response.ErrBadRequest, "phone is required", 400)
 	}
 
-	user, err := u.repo.FindByPhoneCustomer(ctx, req.Phone)
+	_, err := u.repo.FindByPhoneCustomer(ctx, req.Phone)
 	if err != nil {
 		return "", response.NewCustomError(response.ErrNotFound, "user not found", 500)
 	}
-
 	token := uuid.NewString()
-	err = configs.SetRedis(ctx, "reset_pin:"+token, user.Phone, time.Minute*2)
-	if err != nil {
-		return "", response.NewCustomError(response.ErrInternal, "failed to store token", 404)
-	}
-
 	normalized := utils.NormalizePhone(req.Phone)
 
 	deepLink := fmt.Sprintf("https://nusantara-oleh-oleh.com/reset-pin?token=%s", token)
 
 	message := fmt.Sprintf("Klik link berikut untuk reset PIN: \n%s\nBerlaku selama 15 menit", deepLink)
+
+	err = configs.SetRedis(ctx, "reset_pin:"+token, message, time.Minute*2)
+	if err != nil {
+		return "", response.NewCustomError(response.ErrInternal, "failed to store token", 404)
+	}
+
 	// err = twilio.SendWhatsAppMessage(normalized, message)
 	// if err != nil {
 	// 	return "", response.NewCustomError(response.ErrInternal, "failed to send message link", 500)
