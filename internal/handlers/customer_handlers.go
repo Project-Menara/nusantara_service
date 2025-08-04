@@ -489,7 +489,7 @@ func (h *CustomerHandler) ValidateTokenForgotPINCustomer(c echo.Context) error {
 	}
 
 	return response.Success(c, http.StatusOK, "token is valid", map[string]interface{}{
-		"phone": result,
+		"message": result,
 	})
 }
 
