@@ -5,6 +5,7 @@ import (
 	"nusantara_service/configs"
 	"nusantara_service/internal/data/dataSources/cloudinary"
 	"nusantara_service/internal/middlewares"
+	"nusantara_service/internal/workers/producer"
 	"nusantara_service/routes"
 	"os"
 
@@ -36,6 +37,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize Cloudinary service: %v", err)
 	}
+
+	configs.InitRabbitMQ()
+	defer configs.CloseConnections()
+
+	go producer.StartWorkers()
 
 	routes.Routes(e, db, rdb, &cloudinarySvc)
 

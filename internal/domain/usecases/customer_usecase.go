@@ -7,7 +7,7 @@ import (
 	"mime/multipart"
 	"nusantara_service/configs"
 	"nusantara_service/internal/data/dataSources/cloudinary"
-	"nusantara_service/internal/data/dataSources/twilio"
+	"nusantara_service/internal/data/dataSources/rabbitmq"
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
@@ -15,6 +15,7 @@ import (
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
 	otp "nusantara_service/internal/utils/otp"
+	"nusantara_service/internal/workers/consumer"
 	"strings"
 	"time"
 
@@ -67,15 +68,19 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 		otpCode := otp.GenerateOTP(6)
 		redisKey := fmt.Sprintf("otp:%s", normalized)
 
-		err = configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
+		err := configs.SetRedis(ctx, redisKey, otpCode, time.Minute*1)
 		if err != nil {
 			return nil, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
 		}
 
-		err = twilio.SendWhatsAppOTP(normalized, otpCode)
-		if err != nil {
-			return nil, response.NewCustomError(response.ErrInternal, err.Error(), 500)
-		}
+		// err = twilio.SendWhatsAppOTP(normalized, otpCode)
+		// if err != nil {
+		// 	return nil, response.NewCustomError(response.ErrInternal, err.Error(), 500)
+		// }
+		_ = rabbitmq.PublishToQueue("otp_queue", consumer.OTPPayload{
+			Phone: normalized,
+			Code:  otpCode,
+		})
 
 		ttl, err := u.rdb.TTL(ctx, redisKey).Result()
 		if err != nil {
@@ -98,10 +103,15 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 			return nil, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
 		}
 
-		err = twilio.SendWhatsAppOTP(normalized, otpCode)
-		if err != nil {
-			return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
-		}
+		// err = twilio.SendWhatsAppOTP(normalized, otpCode)
+		// if err != nil {
+		// 	return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+		// }
+		_ = rabbitmq.PublishToQueue("otp_queue", consumer.OTPPayload{
+			Phone: normalized,
+			Code:  otpCode,
+		})
+
 		ttl, err := u.rdb.TTL(ctx, redisKey).Result()
 		if err != nil {
 			return nil, err
@@ -184,10 +194,14 @@ func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.Register
 		return nil, 0, response.NewCustomError(response.ErrInternal, "failed to save OTP", 500)
 	}
 
-	err = twilio.SendWhatsAppOTP(normalizedPhone, otpCode)
-	if err != nil {
-		return nil, 0, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
-	}
+	// err = twilio.SendWhatsAppOTP(normalizedPhone, otpCode)
+	// if err != nil {
+	// 	return nil, 0, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+	// }
+	_ = rabbitmq.PublishToQueue("otp_queue", consumer.OTPPayload{
+		Phone: normalizedPhone,
+		Code:  otpCode,
+	})
 
 	ttl, err := u.rdb.TTL(ctx, redisKey).Result()
 	if err != nil {
@@ -217,8 +231,12 @@ func (u *CustomerService) ResendCodeOTPVerify(ctx context.Context, req dto.Resen
 		return response.NewCustomError(response.ErrInternal, "failed to store OTP", 500)
 	}
 
-	if err := twilio.SendWhatsAppOTP(*user.Phone, otpCode); err != nil {
-		return response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+	err = rabbitmq.PublishToQueue("otp_queue", consumer.OTPPayload{
+		Phone: *user.Phone,
+		Code:  otpCode,
+	})
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to initiate OTP resend", 500)
 	}
 
 	return nil
@@ -256,6 +274,10 @@ func (u *CustomerService) VerifyCodeOTP(ctx context.Context, req dto.VerifyOTPRe
 	if err != nil {
 		return response.NewCustomError(response.ErrInternal, "failed to update user status", 500)
 	}
+
+	_ = rabbitmq.PublishToQueue("verified_queue", consumer.VerifiedPayload{
+		Phone: normalizedPhone,
+	})
 
 	return nil
 }
@@ -808,8 +830,12 @@ func (u *CustomerService) NewPhoneCustomer(ctx context.Context, userId string, r
 		return response.NewCustomError(response.ErrInternal, "failed to store OTP", 500)
 	}
 
-	if err := twilio.SendWhatsAppOTP(normalized, otpCode); err != nil {
-		return response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
+	err = rabbitmq.PublishToQueue("otp_queue", consumer.OTPPayload{
+		Phone: normalized,
+		Code:  otpCode,
+	})
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to initiate OTP resend", 500)
 	}
 
 	return nil
@@ -850,6 +876,10 @@ func (u *CustomerService) VerifyCodeOTPCustomerUpdate(ctx context.Context, userI
 		return nil, response.NewCustomError(response.ErrInternal, "failed to update user phone", 500)
 	}
 
+	_ = rabbitmq.PublishToQueue("verified_queue", consumer.VerifiedPayload{
+		Phone: normalizedPhone,
+	})
+
 	return data, nil
 }
 
@@ -873,10 +903,17 @@ func (u *CustomerService) FogotPIN(ctx context.Context, req dto.ForgotPINRequest
 
 	deepLink := fmt.Sprintf("https://nusantara-oleh-oleh.com/reset-pin?token=%s", token)
 
-	message := fmt.Sprintf("Klik link berikut untuk reset PIN: \n%s", deepLink)
-	err = twilio.SendWhatsAppLink(normalized, message)
+	message := fmt.Sprintf("Klik link berikut untuk reset PIN: \n%s\nBerlaku selama 15 menit", deepLink)
+	// err = twilio.SendWhatsAppMessage(normalized, message)
+	// if err != nil {
+	// 	return "", response.NewCustomError(response.ErrInternal, "failed to send message link", 500)
+	// }
+	err = rabbitmq.PublishToQueue(rabbitmq.LinkForgotPINQueueName, consumer.LinkForgotPINPayload{
+		Phone: normalized,
+		Link:  message,
+	})
 	if err != nil {
-		return "", response.NewCustomError(response.ErrInternal, "failed to send message link", 500)
+		return "", response.NewCustomError(response.ErrInternal, "failed to initiate link resend", 500)
 	}
 
 	return token, nil

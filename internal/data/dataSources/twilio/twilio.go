@@ -44,7 +44,7 @@ func SendWhatsAppOTP(to string, otp string) error {
 	return fmt.Errorf("failed to send WhatsApp message: %s", string(body))
 }
 
-func SendWhatsAppLink(to string, message string) error {
+func SendWhatsAppMessage(to string, message string) error {
 	from := os.Getenv("TWILIO_PHONE_NUMBER")
 	sid := os.Getenv("TWILIO_ACCOUNT_SID")
 	token := os.Getenv("TWILIO_AUTH_TOKEN")
