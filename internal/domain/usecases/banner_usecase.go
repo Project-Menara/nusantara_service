@@ -330,6 +330,9 @@ func (b *BannerService) GetAllBannerCustomer(ctx context.Context) ([]*entities.B
 		return nil, response.NewCustomError(response.ErrInternal, "Failed to get banner", 500)
 	}
 
+	dataToCache, _ := json.Marshal(banners)
+	_ = configs.SetRedis(ctx, cacheKey, dataToCache, time.Minute*30)
+
 	return banners, nil
 }
 
