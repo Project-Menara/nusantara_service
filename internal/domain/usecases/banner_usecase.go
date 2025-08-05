@@ -314,16 +314,13 @@ func (b *BannerService) UpdateStatusBanner(ctx context.Context, bannerId string,
 
 // GetAllBannerCustomer implements services.BannerService.
 func (b *BannerService) GetAllBannerCustomer(ctx context.Context) ([]*entities.BannerEntity, error) {
-	cacheKey := "banner_customer"
+	cacheKey := "banner_customer:all"
 	cached, err := configs.GetRedis(ctx, cacheKey)
-	if err == nil {
-		var result struct {
-			Data  []*entities.BannerEntity `json:"data"`
-			Total int                      `json:"total"`
+	if err == nil && cached != "" {
+		var banner []*entities.BannerEntity
+		if err := json.Unmarshal([]byte(cached), &banner); err != nil {
+			return banner, nil
 		}
-
-		_ = json.Unmarshal([]byte(cached), &result)
-		return result.Data, nil
 	}
 	banners, err := b.repo.GetAllBannerCustomer(ctx)
 	if err != nil {
