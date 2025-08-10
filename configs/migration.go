@@ -12,5 +12,10 @@ func RunMigrations(db *gorm.DB) error {
 		&model.User{},
 		&model.Banner{},
 		&model.TypeProduct{},
+		&model.UserPoint{},
+		&model.UserPointHistories{},
+		&model.Voucher{},
+		&model.UserVoucher{},
+		&model.UserVoucherDetail{},
 	)
 }

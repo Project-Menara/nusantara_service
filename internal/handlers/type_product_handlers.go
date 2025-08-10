@@ -54,10 +54,10 @@ func (t *TypeProductHandler) CreateTypeProduct(c echo.Context) error {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create type product")
 	}
 
-	return response.Success(c, http.StatusOK, "Create Type Product Success", newTypeProduct)
+	return response.Success(c, http.StatusCreated, "Create Type Product Success", newTypeProduct)
 }
 
 func (t *TypeProductHandler) GetAllTypeProduct(c echo.Context) error {
@@ -69,7 +69,7 @@ func (t *TypeProductHandler) GetAllTypeProduct(c echo.Context) error {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get type product")
 	}
 
 	meta := utils.BuildPaginationMeta(c, pageInt, limtiInt, total)
@@ -89,7 +89,7 @@ func (t *TypeProductHandler) GetByIdTypeProduct(c echo.Context) error {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get type product")
 	}
 
 	return response.Success(c, http.StatusOK, "Get Type Product Success", typeProduct)
@@ -123,7 +123,7 @@ func (t *TypeProductHandler) UpdateTypeProduct(c echo.Context) error {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update type product")
 	}
 
 	return response.Success(c, http.StatusOK, "Upadated Type Product Success", updated)
@@ -139,7 +139,7 @@ func (t *TypeProductHandler) DeleteTypeProduct(c echo.Context) error {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create type product")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to delete type product")
 	}
 
 	return response.Success(c, http.StatusOK, "Deleted Success", nil)

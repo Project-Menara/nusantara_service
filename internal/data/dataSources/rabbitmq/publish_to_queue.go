@@ -8,7 +8,7 @@ import (
 	"github.com/streadway/amqp"
 )
 
-func PublishToQueue(queueName string, payload interface{}) error {
+func PublishToQueue(exchangeName string, queueName string, payload interface{}) error {
 	ch := configs.RabbitChannel
 
 	body, err := json.Marshal(payload)
@@ -25,7 +25,7 @@ func PublishToQueue(queueName string, payload interface{}) error {
 	}
 
 	err = ch.Publish(
-		"", queueName, false, false,
+		exchangeName, queueName, false, false,
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        body,
