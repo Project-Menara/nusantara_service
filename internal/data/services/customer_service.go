@@ -7,6 +7,8 @@ import (
 	"nusantara_service/internal/dto"
 	"nusantara_service/internal/response"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type CustomerService interface {
@@ -32,4 +34,9 @@ type CustomerService interface {
 	ConfirmationPINCustomerUpdate(ctx context.Context, userId string, req dto.ConfirmNewPINCustomer) (*entities.UserEntity, error)
 	NewPhoneCustomer(ctx context.Context, userId string, req dto.NewPhoneCustomerRequest) error
 	VerifyCodeOTPCustomerUpdate(ctx context.Context, userId string, req dto.VerifyOTPCustomerUpdateRequest) (*entities.UserEntity, error)
+
+	ClaimVoucherCustomer(ctx context.Context, customerID uuid.UUID, voucherID uuid.UUID) (*entities.UserVoucherEntity, error)
+	GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error)
+	GetCustomerPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error)
+	GetCustomerVouchersClaimed(ctx context.Context, customerID uuid.UUID) ([]*entities.UserVoucherEntity, error)
 }

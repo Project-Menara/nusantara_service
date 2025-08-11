@@ -21,4 +21,7 @@ type VoucherRepository interface {
 
 	GetAllVoucherCustomer(ctx context.Context, limit, offset int) ([]*entities.VoucherEntity, error)
 	GetByIdVoucherCustomer(ctx context.Context, id uuid.UUID) (*entities.VoucherEntity, error)
+
+	CheckUserVoucherClaimed(ctx context.Context, customerID, voucherID uuid.UUID) (bool, error)
+	IncreaseVoucherClaimedCount(ctx context.Context, voucherID uuid.UUID) error
 }

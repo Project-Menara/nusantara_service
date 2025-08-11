@@ -5,6 +5,7 @@ import (
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -149,4 +150,103 @@ func (u *CustomerRepositoryImpl) ChangePhoneCustomer(ctx context.Context, userId
 	}
 
 	return &user, nil
+}
+
+// CreateCustomerPoint implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) CreateCustomerPoint(ctx context.Context, userPoint *entities.UserPointEntity) error {
+	err := u.db.WithContext(ctx).Create(userPoint).Error
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// AddDetailVoucher implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) AddDetailVoucher(ctx context.Context, detailVoucher *entities.UserVoucherDetailEntity) (*entities.UserVoucherDetailEntity, error) {
+	err := u.db.WithContext(ctx).Create(detailVoucher)
+	if err != nil {
+		return nil, err.Error
+	}
+
+	return detailVoucher, nil
+}
+
+// AddVoucher implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) AddVoucher(ctx context.Context, userVoucher *entities.UserVoucherEntity) (*entities.UserVoucherEntity, error) {
+	result := u.db.WithContext(ctx).Create(userVoucher)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	// Reload dengan preload relasi
+	if err := u.db.WithContext(ctx).
+		Preload("User").
+		Preload("User.Role").
+		Preload("Voucher").
+		Preload("Voucher.User").
+		Preload("Voucher.User.Role").
+		Preload("Detail").
+		First(userVoucher, "id = ?", userVoucher.ID).Error; err != nil {
+		return nil, err
+	}
+
+	return userVoucher, nil
+}
+
+// GetCustomerPoint implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error) {
+	var cp entities.UserPointEntity
+	if err := u.db.WithContext(ctx).First(&cp, "user_id = ?", customerID).Error; err != nil {
+		return nil, err
+	}
+
+	return &cp, nil
+}
+
+// UpdateCustomerPoint implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) UpdateCustomerPoint(ctx context.Context, customerID uuid.UUID, points int) error {
+	return u.db.WithContext(ctx).Model(&entities.UserPointEntity{}).
+		Where("user_id = ?", customerID).
+		Update("total_points", gorm.Expr("total_points - ?", points)).Error
+}
+
+// CreatePointHistory implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) CreatePointHistory(ctx context.Context, history *entities.UserPointHistoriesEntity) error {
+	return u.db.WithContext(ctx).Create(history).Error
+}
+
+// FindUserPoint implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) FindUserPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error) {
+	var userPoint entities.UserPointEntity
+	if err := u.db.WithContext(ctx).Preload("User").Preload("User.Role").Where("user_id = ?", customerID).First(&userPoint).Error; err != nil {
+		return nil, err
+	}
+
+	return &userPoint, nil
+}
+
+// FindUserPointHistory implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) FindUserPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error) {
+	var histories []*entities.UserPointHistoriesEntity
+	if err := u.db.WithContext(ctx).Preload("User").Preload("User.Role").Where("user_id = ?", customerID).Order("created_at DESC").Find(&histories).Error; err != nil {
+		return nil, err
+	}
+
+	return histories, nil
+}
+
+// FindUserVoucherClaimed implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) FindUserVoucherClaimed(ctx context.Context, userId uuid.UUID) ([]*entities.UserVoucherEntity, error) {
+	var vouchers []*entities.UserVoucherEntity
+	if err := u.db.WithContext(ctx).Preload("User").Preload("User.Role").
+		Preload("Voucher").
+		Preload("Voucher.User").
+		Preload("Voucher.User.Role").
+		Preload("Detail").
+		Where("user_id = ?", userId).Order("created_at DESC").Find(&vouchers).Error; err != nil {
+		return nil, err
+	}
+
+	return vouchers, nil
 }

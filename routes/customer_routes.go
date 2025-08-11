@@ -14,7 +14,8 @@ import (
 
 func CustomerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinarySvc *cloudinary.CloudinaryService) {
 	custRepo := repositories.NewCustomerRepositoryImpl(db)
-	custService := usecases.NewCustomerUsecase(custRepo, rdb, cloudinarySvc)
+	voucherRepo := repositories.NewVoucherRepositoryImpl(db)
+	custService := usecases.NewCustomerUsecase(custRepo, rdb, cloudinarySvc, db, voucherRepo)
 	custHandler := handlers.NewCustomerHandler(custService)
 
 	e.POST("/check-phone", custHandler.CheckPhoneCustomer)
@@ -36,4 +37,9 @@ func CustomerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinarySvc
 	e.GET("/validate-forgot-pin", custHandler.ValidateTokenForgotPINCustomer)
 	e.POST("/new-pin-forgot", custHandler.NewPINCustomerForgotPIN)
 	e.POST("/confirm-pin-forgot", custHandler.ConfirmationPINCustomerForgotPIN)
+
+	e.POST("/claim-voucher/:voucherId", custHandler.ClaimVoucherCustomer, middlewares.JWTMiddleware(rdb))
+	e.GET("/point", custHandler.GetCustomerPoint, middlewares.JWTMiddleware(rdb))
+	e.GET("/point/history", custHandler.GetCustomerPointHistory, middlewares.JWTMiddleware(rdb))
+	e.GET("/vouchers/claimed", custHandler.GetCustomerVouchersClaimed, middlewares.JWTMiddleware(rdb))
 }

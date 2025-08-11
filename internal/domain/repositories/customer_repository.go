@@ -3,6 +3,8 @@ package repositories
 import (
 	"context"
 	"nusantara_service/internal/domain/entities"
+
+	"github.com/google/uuid"
 )
 
 type CustomerRepository interface {
@@ -19,4 +21,14 @@ type CustomerRepository interface {
 
 	//Change Phone
 	ChangePhoneCustomer(ctx context.Context, userId string, data *entities.UserEntity) (*entities.UserEntity, error)
+
+	CreateCustomerPoint(ctx context.Context, userPoint *entities.UserPointEntity) error
+	AddVoucher(ctx context.Context, userVoucher *entities.UserVoucherEntity) (*entities.UserVoucherEntity, error)
+	AddDetailVoucher(ctx context.Context, detailVoucher *entities.UserVoucherDetailEntity) (*entities.UserVoucherDetailEntity, error)
+	GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error)
+	UpdateCustomerPoint(ctx context.Context, customerID uuid.UUID, points int) error
+	CreatePointHistory(ctx context.Context, history *entities.UserPointHistoriesEntity) error
+	FindUserPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error)
+	FindUserPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error)
+	FindUserVoucherClaimed(ctx context.Context, userId uuid.UUID) ([]*entities.UserVoucherEntity, error)
 }

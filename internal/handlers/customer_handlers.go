@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -544,4 +545,110 @@ func (h *CustomerHandler) ConfirmationPINCustomerForgotPIN(c echo.Context) error
 		"token": token,
 		"user":  user,
 	})
+}
+
+func (h *CustomerHandler) ClaimVoucherCustomer(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	voucherID, err := uuid.Parse(c.Param("voucherId"))
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid voucher ID", err.Error())
+	}
+
+	customerVoucher, err := h.CustomerService.ClaimVoucherCustomer(c.Request().Context(), uuid.MustParse(custID), voucherID)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Voucher claimed successfully", customerVoucher)
+}
+
+func (h *CustomerHandler) GetCustomerPoint(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	customerPoint, err := h.CustomerService.GetCustomerPoint(c.Request().Context(), uuid.MustParse(custID))
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Customer point retrieved successfully", customerPoint)
+
+}
+
+func (h *CustomerHandler) GetCustomerPointHistory(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	customerPointHistory, err := h.CustomerService.GetCustomerPointHistory(c.Request().Context(), uuid.MustParse(custID))
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Customer point history retrieved successfully", customerPointHistory)
+}
+
+func (h *CustomerHandler) GetCustomerVouchersClaimed(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	customerVouchers, err := h.CustomerService.GetCustomerVouchersClaimed(c.Request().Context(), uuid.MustParse(custID))
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Customer claimed vouchers retrieved successfully", customerVouchers)
 }

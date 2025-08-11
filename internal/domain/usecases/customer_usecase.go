@@ -2,6 +2,7 @@ package usecases
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"mime/multipart"
@@ -26,12 +27,14 @@ import (
 
 type CustomerService struct {
 	repo          repositories.CustomerRepository
+	voucherRepo   repositories.VoucherRepository
 	rdb           *redis.Client
 	cloudinarySvc cloudinary.CloudinaryService
+	db            *gorm.DB
 }
 
-func NewCustomerUsecase(repo repositories.CustomerRepository, rdb *redis.Client, cloudinarySvc *cloudinary.CloudinaryService) services.CustomerService {
-	return &CustomerService{repo: repo, rdb: rdb, cloudinarySvc: *cloudinarySvc}
+func NewCustomerUsecase(repo repositories.CustomerRepository, rdb *redis.Client, cloudinarySvc *cloudinary.CloudinaryService, db *gorm.DB, voucherRepo repositories.VoucherRepository) services.CustomerService {
+	return &CustomerService{repo: repo, rdb: rdb, cloudinarySvc: *cloudinarySvc, db: db, voucherRepo: voucherRepo}
 }
 
 func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequest) (*response.CheckPhoneResult, error) {
@@ -185,6 +188,16 @@ func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.Register
 	if err != nil {
 		return nil, 0, response.NewCustomError(response.ErrInternal, "failed to create customer", 500)
 	}
+
+	customerPoint := &entities.UserPointEntity{
+		ID:          uuid.New(),
+		UserID:      uuid.MustParse(createdCustomer.ID),
+		TotalPoints: 0,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	_ = u.repo.CreateCustomerPoint(ctx, customerPoint)
 
 	otpCode := otp.GenerateOTP(6)
 	redisKey := fmt.Sprintf("otp:%s", normalizedPhone)
@@ -1025,4 +1038,206 @@ func (u *CustomerService) CreateNewConfirmPIN(ctx context.Context, tokenPIN stri
 		return nil, "", response.NewCustomError(response.ErrInternal, "failed to store session", 500)
 	}
 	return user, token, nil
+}
+
+// ClaimVoucherCustomer implements services.CustomerService.
+func (u *CustomerService) ClaimVoucherCustomer(ctx context.Context, customerID uuid.UUID, voucherID uuid.UUID) (*entities.UserVoucherEntity, error) {
+	tx := u.db.WithContext(ctx).Begin()
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	voucher, err := u.voucherRepo.GetByIdVoucherCustomer(ctx, voucherID)
+	if err != nil {
+		tx.Rollback()
+		return nil, response.NewCustomError(response.ErrNotFound, "voucher not found", 404)
+	}
+
+	now := time.Now()
+	if now.After(voucher.EndDate) {
+		tx.Rollback()
+		return nil, response.NewCustomError(response.ErrBadRequest, "voucher expired", 400)
+	}
+
+	if voucher.ClaimedCount >= voucher.Quota {
+		tx.Rollback()
+		return nil, response.NewCustomError(response.ErrBadRequest, "voucher not available", 400)
+	}
+
+	claimed, err := u.voucherRepo.CheckUserVoucherClaimed(ctx, customerID, voucherID)
+	if err != nil {
+		tx.Rollback()
+		return nil, err
+	}
+	if claimed {
+		tx.Rollback()
+		return nil, response.NewCustomError(response.ErrInternal, "voucher already claimed", 500)
+	}
+
+	if voucher.PointCost > 0 {
+		customerPoint, err := u.repo.GetCustomerPoint(ctx, customerID)
+		if err != nil {
+			tx.Rollback()
+			return nil, response.NewCustomError(response.ErrNotFound, "points data not found", 404)
+		}
+		if customerPoint.TotalPoints < voucher.PointCost {
+			tx.Rollback()
+			return nil, response.NewCustomError(response.ErrBadRequest, "not enough points to claim voucher", 400)
+		}
+
+		if err := u.repo.UpdateCustomerPoint(ctx, customerID, voucher.PointCost); err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+
+		history := entities.UserPointHistoriesEntity{
+			ID:          uuid.New(),
+			UserID:      customerID,
+			PointType:   "exchange",
+			Source:      "voucher",
+			SourceId:    voucher.ID.String(),
+			Points:      voucher.PointCost,
+			Direction:   "out",
+			Description: "Claim voucher " + voucher.Code,
+		}
+
+		if err := u.repo.CreatePointHistory(ctx, &history); err != nil {
+			tx.Rollback()
+			return nil, response.NewCustomError(response.ErrInternal, "failed to create point history", 500)
+		}
+	}
+
+	detailVoucher := entities.UserVoucherDetailEntity{
+		ID:                uuid.New(),
+		VoucherCode:       voucher.Code,
+		DiscountType:      voucher.DiscountType,
+		DiscountAmount:    voucher.DiscountAmount,
+		DiscountPercent:   voucher.DiscountPercent,
+		MinPurchaseAmount: voucher.MinimumSpend,
+		ValidFrom:         voucher.StartDate,
+		ValidUntil:        voucher.EndDate,
+		Description:       voucher.Description,
+	}
+
+	if _, err := u.repo.AddDetailVoucher(ctx, &detailVoucher); err != nil {
+		tx.Rollback()
+		return nil, response.NewCustomError(response.ErrInternal, "failed to add voucher detail", 500)
+	}
+
+	userVoucher := entities.UserVoucherEntity{
+		ID:        uuid.New(),
+		UserID:    customerID,
+		VoucherID: voucher.ID,
+		DetailID:  detailVoucher.ID,
+		IsUsed:    false,
+	}
+
+	created, err := u.repo.AddVoucher(ctx, &userVoucher)
+	if err != nil {
+		tx.Rollback()
+		return nil, response.NewCustomError(response.ErrInternal, "failed to add user voucher", 500)
+	}
+
+	if err := u.voucherRepo.IncreaseVoucherClaimedCount(ctx, voucherID); err != nil {
+		tx.Rollback()
+		return nil, response.NewCustomError(response.ErrInternal, "failed to increase voucher claimed count", 500)
+	}
+
+	u.InvalidateCustomerCache(ctx)
+
+	return created, tx.Commit().Error
+
+}
+
+func (v *CustomerService) InvalidateCustomerCache(ctx context.Context) {
+	cp := v.rdb.Scan(ctx, 0, "customer_point:*", 0).Iterator()
+	for cp.Next(ctx) {
+		v.rdb.Del(ctx, cp.Val())
+	}
+	cph := v.rdb.Scan(ctx, 0, "customer_point_history:*", 0).Iterator()
+	for cph.Next(ctx) {
+		v.rdb.Del(ctx, cph.Val())
+	}
+	vc := v.rdb.Scan(ctx, 0, "customer_vouchers_claimed:*", 0).Iterator()
+	for vc.Next(ctx) {
+		v.rdb.Del(ctx, vc.Val())
+	}
+}
+
+// GetCustomerPoint implements services.CustomerService.
+func (u *CustomerService) GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error) {
+	cacheKey := fmt.Sprintf("customer_point:%s", customerID.String())
+	cached, err := configs.GetRedis(ctx, cacheKey)
+	if err == nil && cached != "" {
+		var userPoint entities.UserPointEntity
+		if err := json.Unmarshal([]byte(cached), &userPoint); err == nil {
+			return &userPoint, nil
+		}
+	}
+
+	customerPoint, err := u.repo.FindUserPoint(ctx, customerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "customer point not found", 404)
+		}
+		return nil, err
+	}
+
+	dataCache, _ := json.Marshal(customerPoint)
+	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
+
+	return customerPoint, nil
+}
+
+// GetCustomerPointHistory implements services.CustomerService.
+func (u *CustomerService) GetCustomerPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error) {
+	cacheKey := fmt.Sprintf("customer_point_history:%s", customerID.String())
+	cached, err := configs.GetRedis(ctx, cacheKey)
+	if err == nil && cached != "" {
+		var pointHistories []*entities.UserPointHistoriesEntity
+		if err := json.Unmarshal([]byte(cached), &pointHistories); err == nil {
+			return pointHistories, nil
+		}
+	}
+
+	pointHistories, err := u.repo.FindUserPointHistory(ctx, customerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "customer point history not found", 404)
+		}
+		return nil, err
+	}
+
+	dataCache, _ := json.Marshal(pointHistories)
+	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
+
+	return pointHistories, nil
+}
+
+// GetCustomerVouchersClaimed implements services.CustomerService.
+func (u *CustomerService) GetCustomerVouchersClaimed(ctx context.Context, customerID uuid.UUID) ([]*entities.UserVoucherEntity, error) {
+	cacheKey := fmt.Sprintf("customer_vouchers_claimed:%s", customerID.String())
+	cached, err := configs.GetRedis(ctx, cacheKey)
+	if err == nil && cached != "" {
+		var userVouchers []*entities.UserVoucherEntity
+		if err := json.Unmarshal([]byte(cached), &userVouchers); err == nil {
+			return userVouchers, nil
+		}
+	}
+
+	userVouchers, err := u.repo.FindUserVoucherClaimed(ctx, customerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "customer vouchers claimed not found", 404)
+		}
+		return nil, err
+	}
+
+	dataCache, _ := json.Marshal(userVouchers)
+	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
+
+	return userVouchers, nil
 }

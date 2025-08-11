@@ -149,3 +149,20 @@ func (v *VoucherRepositoryImpl) GetByIdVoucherCustomer(ctx context.Context, id u
 
 	return &voucher, nil
 }
+
+// CheckUserVoucherClaimed implements repositories.VoucherRepository.
+func (v *VoucherRepositoryImpl) CheckUserVoucherClaimed(ctx context.Context, customerID uuid.UUID, voucherID uuid.UUID) (bool, error) {
+	var count int64
+	err := v.db.WithContext(ctx).Model(&entities.UserVoucherEntity{}).
+		Where("user_id = ? AND voucher_id = ?", customerID, voucherID).
+		Count(&count).Error
+
+	return count > 0, err
+}
+
+// IncreaseVoucherClaimedCount implements repositories.VoucherRepository.
+func (v *VoucherRepositoryImpl) IncreaseVoucherClaimedCount(ctx context.Context, voucherID uuid.UUID) error {
+	return v.db.WithContext(ctx).Model(&entities.VoucherEntity{}).
+		Where("id = ?", voucherID).
+		Update("claimed_count", gorm.Expr("claimed_count + ?", 1)).Error
+}

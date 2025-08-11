@@ -24,6 +24,6 @@ func VoucherRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinary *cl
 	e.DELETE("/:id/delete", voucherHandler.DeleteVoucher, middlewares.JWTMiddleware(rdb))
 	e.PUT("/:id/edit-status", voucherHandler.UpdateStatusVoucher, middlewares.JWTMiddleware(rdb))
 
-	e.GET("/customer", voucherHandler.GetAllVoucherCustomer)
-	e.GET("/:id/customer", voucherHandler.GetByIdVoucherCustomer)
+	e.GET("/customer", voucherHandler.GetAllVoucherCustomer, middlewares.JWTMiddleware(rdb))
+	e.GET("/:id/customer", voucherHandler.GetByIdVoucherCustomer, middlewares.JWTMiddleware(rdb))
 }
