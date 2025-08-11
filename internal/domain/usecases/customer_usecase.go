@@ -921,13 +921,10 @@ func (u *CustomerService) FogotPIN(ctx context.Context, req dto.ForgotPINRequest
 	// if err != nil {
 	// 	return "", response.NewCustomError(response.ErrInternal, "failed to send message link", 500)
 	// }
-	err = rabbitmq.PublishToQueue("forgot_pin", rabbitmq.LinkForgotPINQueueName, consumer.LinkForgotPINPayload{
+	_ = rabbitmq.PublishToQueue("forgot_pin", rabbitmq.LinkForgotPINQueueName, consumer.LinkForgotPINPayload{
 		Phone: normalized,
 		Link:  message,
 	})
-	if err != nil {
-		return "", response.NewCustomError(response.ErrInternal, "failed to initiate link resend", 500)
-	}
 
 	return token, nil
 }
