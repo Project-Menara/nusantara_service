@@ -1165,28 +1165,51 @@ func (v *CustomerService) InvalidateCustomerCache(ctx context.Context) {
 }
 
 // GetCustomerPoint implements services.CustomerService.
-func (u *CustomerService) GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error) {
+func (u *CustomerService) GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, int, *time.Time, error) {
 	cacheKey := fmt.Sprintf("customer_point:%s", customerID.String())
 	cached, err := configs.GetRedis(ctx, cacheKey)
 	if err == nil && cached != "" {
 		var userPoint entities.UserPointEntity
 		if err := json.Unmarshal([]byte(cached), &userPoint); err == nil {
-			return &userPoint, nil
+			return &userPoint, 0, nil, nil
 		}
 	}
 
-	customerPoint, err := u.repo.FindUserPoint(ctx, customerID)
+	// Ambil data awal
+	customerPoint, totalExpired, expiredDate, err := u.repo.FindUserPoint(ctx, customerID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, response.NewCustomError(response.ErrNotFound, "customer point not found", 404)
+			return nil, 0, nil, response.NewCustomError(response.ErrNotFound, "customer point not found", 404)
 		}
-		return nil, err
+		return nil, 0, nil, err
 	}
 
+	// Kalau ada yang expired
+	if expiredDate != nil && time.Now().After(*expiredDate) && totalExpired > 0 {
+		// Update jadi expired
+		err = u.repo.MarkPointsAsExpired(ctx, customerID, *expiredDate)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+
+		// Kurangi total points di tabel utama
+		err = u.repo.DecreaseTotalPoints(ctx, customerID, totalExpired)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+
+		// Ambil ulang data setelah update
+		customerPoint, totalExpired, expiredDate, err = u.repo.FindUserPoint(ctx, customerID)
+		if err != nil {
+			return nil, 0, nil, err
+		}
+	}
+
+	// Cache hasil
 	dataCache, _ := json.Marshal(customerPoint)
 	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
 
-	return customerPoint, nil
+	return customerPoint, totalExpired, expiredDate, nil
 }
 
 // GetCustomerPointHistory implements services.CustomerService.

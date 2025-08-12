@@ -4,6 +4,7 @@ import (
 	"context"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
+	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -216,14 +217,104 @@ func (u *CustomerRepositoryImpl) CreatePointHistory(ctx context.Context, history
 	return u.db.WithContext(ctx).Create(history).Error
 }
 
-// FindUserPoint implements repositories.CustomerRepository.
-func (u *CustomerRepositoryImpl) FindUserPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error) {
+func (u *CustomerRepositoryImpl) FindUserPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, int, *time.Time, error) {
 	var userPoint entities.UserPointEntity
-	if err := u.db.WithContext(ctx).Preload("User").Preload("User.Role").Where("user_id = ?", customerID).First(&userPoint).Error; err != nil {
-		return nil, err
+	if err := u.db.WithContext(ctx).
+		Preload("User").
+		Preload("User.Role").
+		Where("user_id = ?", customerID).
+		First(&userPoint).Error; err != nil {
+		return nil, 0, nil, err
 	}
 
-	return &userPoint, nil
+	// Hitung total poin aktif
+	var totalPoints int
+	err := u.db.WithContext(ctx).
+		Model(&entities.UserPointHistoriesEntity{}).
+		Select("COALESCE(SUM(CASE WHEN direction = 'in' THEN points ELSE -points END),0)").
+		Where("user_id = ?", customerID).
+		Where("point_type IN ('reward','purchase','exchange')").
+		Scan(&totalPoints).Error
+	if err != nil {
+		return nil, 0, nil, err
+	}
+	userPoint.TotalPoints = totalPoints
+
+	// Ambil batch "in"
+	var ins []entities.UserPointHistoriesEntity
+	err = u.db.WithContext(ctx).
+		Where("user_id = ? AND direction = 'in' AND point_type IN ('reward','purchase','exchange')", customerID).
+		Order("expired_at ASC, created_at ASC").
+		Find(&ins).Error
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// Ambil batch "out"
+	var outs []entities.UserPointHistoriesEntity
+	err = u.db.WithContext(ctx).
+		Where("user_id = ? AND direction = 'out' AND point_type IN ('reward','purchase','exchange')", customerID).
+		Order("created_at ASC").
+		Find(&outs).Error
+	if err != nil {
+		return nil, 0, nil, err
+	}
+
+	// FIFO: kurangi out dari in
+	for i := range outs {
+		toDeduct := outs[i].Points
+		for j := range ins {
+			if toDeduct <= 0 {
+				break
+			}
+			if ins[j].Points > 0 {
+				if ins[j].Points > toDeduct {
+					ins[j].Points -= toDeduct
+					toDeduct = 0
+				} else {
+					toDeduct -= ins[j].Points
+					ins[j].Points = 0
+				}
+			}
+		}
+	}
+
+	// Cari expired terdekat (yang masih ada poinnya)
+	var nextExpiredDate *time.Time
+	for _, in := range ins {
+		if in.ExpiredAt != nil && in.Points > 0 {
+			nextExpiredDate = in.ExpiredAt
+			break
+		}
+	}
+
+	if nextExpiredDate == nil {
+		return &userPoint, 0, nil, nil
+	}
+
+	// Hitung total expired untuk tanggal itu
+	totalExpired := 0
+	for _, in := range ins {
+		if in.ExpiredAt != nil && in.ExpiredAt.Equal(*nextExpiredDate) {
+			totalExpired += in.Points
+		}
+	}
+
+	return &userPoint, totalExpired, nextExpiredDate, nil
+}
+
+func (u *CustomerRepositoryImpl) MarkPointsAsExpired(ctx context.Context, userID uuid.UUID, expiredDate time.Time) error {
+	return u.db.WithContext(ctx).
+		Model(&entities.UserPointHistoriesEntity{}).
+		Where("user_id = ? AND direction = 'in' AND expired_at <= ? AND point_type IN ('reward','purchase','exchange')", userID, expiredDate).
+		Update("point_type", "expired").Error
+}
+
+func (u *CustomerRepositoryImpl) DecreaseTotalPoints(ctx context.Context, customerID uuid.UUID, amount int) error {
+	return u.db.WithContext(ctx).
+		Model(&entities.UserPointEntity{}).
+		Where("user_id = ?", customerID).
+		Update("total_points", gorm.Expr("total_points - ?", amount)).Error
 }
 
 // FindUserPointHistory implements repositories.CustomerRepository.

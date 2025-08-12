@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"nusantara_service/internal/domain/entities"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -28,7 +29,9 @@ type CustomerRepository interface {
 	GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error)
 	UpdateCustomerPoint(ctx context.Context, customerID uuid.UUID, points int) error
 	CreatePointHistory(ctx context.Context, history *entities.UserPointHistoriesEntity) error
-	FindUserPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error)
+	FindUserPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, int, *time.Time, error)
+	MarkPointsAsExpired(ctx context.Context, userID uuid.UUID, expiredDate time.Time) error
+	DecreaseTotalPoints(ctx context.Context, customerID uuid.UUID, amount int) error
 	FindUserPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error)
 	FindUserVoucherClaimed(ctx context.Context, userId uuid.UUID) ([]*entities.UserVoucherEntity, error)
 }

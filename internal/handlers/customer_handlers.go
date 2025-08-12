@@ -591,7 +591,7 @@ func (h *CustomerHandler) GetCustomerPoint(c echo.Context) error {
 	claims := user.Claims.(jwt.MapClaims)
 	custID := claims["user_id"].(string)
 
-	customerPoint, err := h.CustomerService.GetCustomerPoint(c.Request().Context(), uuid.MustParse(custID))
+	customerPoint, totalExpired, expiredDates, err := h.CustomerService.GetCustomerPoint(c.Request().Context(), uuid.MustParse(custID))
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
@@ -599,7 +599,11 @@ func (h *CustomerHandler) GetCustomerPoint(c echo.Context) error {
 		return response.Error(c, http.StatusBadRequest, "something went wrong", err.Error())
 	}
 
-	return response.Success(c, http.StatusOK, "Customer point retrieved successfully", customerPoint)
+	return response.Success(c, http.StatusOK, "Customer point retrieved successfully", map[string]interface{}{
+		"customer_point": customerPoint,
+		"total_expired":  totalExpired,
+		"expired_dates":  expiredDates,
+	})
 
 }
 

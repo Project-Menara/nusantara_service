@@ -36,7 +36,7 @@ type CustomerService interface {
 	VerifyCodeOTPCustomerUpdate(ctx context.Context, userId string, req dto.VerifyOTPCustomerUpdateRequest) (*entities.UserEntity, error)
 
 	ClaimVoucherCustomer(ctx context.Context, customerID uuid.UUID, voucherID uuid.UUID) (*entities.UserVoucherEntity, error)
-	GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, error)
+	GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, int, *time.Time, error)
 	GetCustomerPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error)
 	GetCustomerVouchersClaimed(ctx context.Context, customerID uuid.UUID) ([]*entities.UserVoucherEntity, error)
 }
