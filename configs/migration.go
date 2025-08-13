@@ -17,5 +17,8 @@ func RunMigrations(db *gorm.DB) error {
 		&model.Voucher{},
 		&model.UserVoucher{},
 		&model.UserVoucherDetail{},
+		&model.Image{},
+		&model.Product{},
+		&model.ProductImage{},
 	)
 }

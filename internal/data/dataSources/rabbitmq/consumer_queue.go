@@ -8,6 +8,17 @@ import (
 )
 
 func ConsumeQueueAuto(queueName string, handler func(amqp.Delivery)) error {
+	_, err := configs.RabbitChannel.QueueDeclare(
+		queueName,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare %s: %v", queueName, err)
+	}
 	msgs, err := configs.RabbitChannel.Consume(
 		queueName,
 		"",
@@ -33,6 +44,17 @@ func ConsumeQueueAuto(queueName string, handler func(amqp.Delivery)) error {
 }
 
 func ConsumeQueueManual(queueName string, handler func(amqp.Delivery)) error {
+	_, err := configs.RabbitChannel.QueueDeclare(
+		queueName,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		log.Fatalf("Failed to declare %s: %v", queueName, err)
+	}
 	msgs, err := configs.RabbitChannel.Consume(
 		queueName,
 		"",

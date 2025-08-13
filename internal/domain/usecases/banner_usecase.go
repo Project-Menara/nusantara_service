@@ -86,7 +86,7 @@ func (b *BannerService) CreateBanner(ctx context.Context, userId string, req dto
 		Name:        name,
 		Description: description,
 		Status:      req.Status,
-		Photo:       imageUrl,
+		Photo:       imageUrl.URL,
 		UserID:      userUUID,
 		User:        *user,
 	}
@@ -220,7 +220,7 @@ func (b *BannerService) UpdateBanner(ctx context.Context, userId string, id uuid
 			return nil, response.NewCustomError(response.ErrInternal, "failed to upload image", 500)
 		}
 
-		banner.Photo = imageUrl
+		banner.Photo = imageUrl.URL
 	}
 
 	user, err := b.repo.FindByUserIDSuperAdmin(ctx, userId)

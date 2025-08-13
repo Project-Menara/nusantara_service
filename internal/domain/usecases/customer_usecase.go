@@ -625,7 +625,7 @@ func (u *CustomerService) UpdateProfileCustomer(ctx context.Context, userId stri
 			return nil, response.NewCustomError(response.ErrInternal, "failed to upload photo to Cloudinary", 500)
 		}
 
-		user.Photo = &photoURL
+		user.Photo = &photoURL.URL
 
 	}
 

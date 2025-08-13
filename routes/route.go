@@ -16,4 +16,5 @@ func Routes(e *echo.Echo, db *gorm.DB, rdb *redis.Client, cloudinarySvc *cloudin
 	BannerRoutes(v1.Group("/banner"), db, rdb, cloudinarySvc)
 	TypeProductRoutes(v1.Group("/type-product"), db, rdb, cloudinarySvc)
 	VoucherRoutes(v1.Group("/voucher"), db, rdb, cloudinarySvc)
+	ProductRoutes(v1.Group("/product"), db, rdb, cloudinarySvc)
 }

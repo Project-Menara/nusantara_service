@@ -6,4 +6,7 @@ func StartWorkers() {
 	go consumer.ConsumeOTPQueue()
 	go consumer.ConsumeVerifiedQueue()
 	go consumer.ConsumeLinkForgotPINQueue()
+
+	go consumer.ConsumeImageDeleteQueue()
+	go consumer.ConsumeCacheInvalidateQueue()
 }

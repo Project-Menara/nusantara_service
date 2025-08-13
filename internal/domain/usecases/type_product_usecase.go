@@ -80,7 +80,7 @@ func (t *TypeProductService) CreateTypeProduct(ctx context.Context, userId strin
 	newTypeProduct := &entities.TypeProductEntity{
 		Name:   name,
 		Status: req.Status,
-		Image:  imageUrl,
+		Image:  imageUrl.URL,
 		UserID: userUUID,
 		User:   *user,
 	}
@@ -202,7 +202,7 @@ func (t *TypeProductService) UpdateTypeProduct(ctx context.Context, userId strin
 			return nil, response.NewCustomError(response.ErrInternal, "failed to upload image", 500)
 		}
 
-		typeProduct.Image = imageUrl
+		typeProduct.Image = imageUrl.URL
 
 	}
 
