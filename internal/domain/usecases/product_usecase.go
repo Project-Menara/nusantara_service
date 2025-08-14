@@ -51,31 +51,6 @@ func BuildPublicID(folder, filename string) string {
 	return fmt.Sprintf("%s/%s", folder, filename)
 }
 
-func PublicIDFromURL(u string) string {
-	if u == "" {
-		return ""
-	}
-	const pivot = "/upload/"
-	idx := strings.Index(u, pivot)
-	if idx == -1 {
-		return u // fallback
-	}
-	sub := u[idx+len(pivot):]
-
-	// buang versi v123456/ jika ada
-	if strings.HasPrefix(sub, "v") {
-		if s := strings.Index(sub, "/"); s != -1 {
-			sub = sub[s+1:]
-		}
-	}
-
-	// buang ekstensi
-	if dot := strings.LastIndex(sub, "."); dot != -1 {
-		sub = sub[:dot]
-	}
-	return sub
-}
-
 func (p *ProductService) UploadMany(ctx context.Context, folder, prefix string, files []*multipart.FileHeader, workers int) ([]string, []string, error) {
 	if len(files) == 0 {
 		return nil, nil, nil
@@ -379,8 +354,11 @@ func (p *ProductService) GetProductAll(ctx context.Context, page int, limit int,
 }
 
 // UpdateProduct implements services.ProductService.
-// UpdateProduct implements services.ProductService.
-func (p *ProductService) UpdateProduct(ctx context.Context, userId uuid.UUID, req dto.UpdateProductRequest) (*entities.ProductEntity, error) {
+func (p *ProductService) UpdateProduct(
+	ctx context.Context,
+	userId uuid.UUID,
+	req dto.UpdateProductRequest,
+) (*entities.ProductEntity, error) {
 	product, err := p.repo.GetByID(ctx, req.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -389,7 +367,7 @@ func (p *ProductService) UpdateProduct(ctx context.Context, userId uuid.UUID, re
 		return nil, response.NewCustomError(response.ErrInternal, err.Error(), 500)
 	}
 
-	// Update product fields if provided
+	// Update basic fields
 	if req.Name != nil {
 		product.Name = *req.Name
 	}
@@ -405,6 +383,8 @@ func (p *ProductService) UpdateProduct(ctx context.Context, userId uuid.UUID, re
 	if req.Description != nil {
 		product.Description = *req.Description
 	}
+
+	// Update type product
 	if req.TypeProductID != nil {
 		typeProduct, err := p.typeProductRepo.FindById(ctx, *req.TypeProductID)
 		if err != nil {
@@ -416,7 +396,7 @@ func (p *ProductService) UpdateProduct(ctx context.Context, userId uuid.UUID, re
 		product.TypeProductID = typeProduct.ID
 	}
 
-	// Check if the user exists
+	// Update createdBy
 	user, err := p.repo.FindByUserIDSuperAdmin(ctx, userId.String())
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -428,115 +408,100 @@ func (p *ProductService) UpdateProduct(ctx context.Context, userId uuid.UUID, re
 
 	nameSlug := Sanitize(product.Name)
 	folder := "nusantara_service/product"
+
 	var toDeletePIDs []string
 
-	// Start a database transaction to ensure atomicity
-	err = configs.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Handle cover image update
-		if req.NewCover != nil {
-			// Get public ID of old cover image for deletion
-			if product.Image.ImagePath != "" {
-				oldCoverPID := PublicIDFromURL(product.Image.ImagePath)
-				if oldCoverPID != "" {
-					toDeletePIDs = append(toDeletePIDs, oldCoverPID)
-				}
-			}
+	// ===== Update Cover =====
+	if req.NewCover != nil {
+		ext := strings.ToLower(filepath.Ext(req.NewCover.Filename))
+		filename := fmt.Sprintf("cover_%s%s", nameSlug, ext)
 
-			// Upload new cover image
-			ext := strings.ToLower(filepath.Ext(req.NewCover.Filename))
-			filename := fmt.Sprintf("cover_%s%s", nameSlug, ext)
-			u, err := p.cloudinary.UploadImage(ctx, req.NewCover, folder, filename)
-			if err != nil {
-				return response.NewCustomError(response.ErrInternal, "failed to upload new cover image", 500)
-			}
+		u, err := p.cloudinary.UploadImage(ctx, req.NewCover, folder, filename)
+		if err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to upload new cover image", 500)
+		}
 
-			// Delete old cover image entity and create new one
-			if err := tx.Delete(&product.Image).Error; err != nil {
-				return response.NewCustomError(response.ErrInternal, "failed to delete old cover image", 500)
-			}
+		if product.Image.ImagePath != "" {
+			toDeletePIDs = append(toDeletePIDs, product.Image.ImagePath)
+		}
 
-			img := entities.ImageEntity{
+		img := entities.ImageEntity{
+			ID:        uuid.New(),
+			ImagePath: u.URL,
+		}
+		if err := configs.DB.WithContext(ctx).Create(&img).Error; err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to create new cover image", 500)
+		}
+
+		product.ImageID = img.ID
+		product.Image = img // ✅ update field struct biar langsung keisi
+	}
+
+	// ===== Replace Gallery =====
+	if req.ReplaceGallery {
+		oldPIDs, _ := p.repo.GetProductImagePublicIDs(ctx, product.ID)
+		toDeletePIDs = append(toDeletePIDs, oldPIDs...)
+
+		if err := p.repo.DeleteProductImages(ctx, product.ID); err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to delete old product images", 500)
+		}
+	}
+
+	// ===== Add New Gallery =====
+	if len(req.NewGallery) > 0 {
+		urls, pids, err := p.UploadMany(ctx, folder, "gallery_"+nameSlug, req.NewGallery, 4)
+		if err != nil {
+			return nil, err
+		}
+
+		imgs := make([]entities.ImageEntity, 0, len(pids))
+		for _, url := range urls {
+			imgs = append(imgs, entities.ImageEntity{
 				ID:        uuid.New(),
-				ImagePath: u.URL,
-			}
-			if err := tx.Create(&img).Error; err != nil {
-				return response.NewCustomError(response.ErrInternal, "failed to create new cover image", 500)
-			}
-			product.ImageID = img.ID
+				ImagePath: url,
+			})
+		}
+		if err := p.repo.CreateImages(ctx, imgs); err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to create new gallery images", 500)
 		}
 
-		// Handle gallery image update
-		if req.ReplaceGallery {
-			// Get public IDs of old gallery images for deletion
-			oldPIDs, err := p.repo.GetProductImagePublicIDs(ctx, product.ID)
-			if err != nil {
-				return response.NewCustomError(response.ErrInternal, "failed to get old product image IDs", 500)
-			}
-			toDeletePIDs = append(toDeletePIDs, oldPIDs...)
-
-			// Delete old product_images and image entities
-			if err := p.repo.DeleteProductImages(ctx, product.ID); err != nil {
-				return response.NewCustomError(response.ErrInternal, "failed to delete old product images", 500)
-			}
+		pivs := make([]entities.ProductImageEntity, 0, len(imgs))
+		for _, im := range imgs {
+			pivs = append(pivs, entities.ProductImageEntity{
+				ID:        uuid.New(),
+				ProductID: product.ID,
+				Product:   *product,
+				ImageID:   im.ID,
+				Image:     im,
+				AltText:   product.Name,
+			})
 		}
-
-		// Upload and create new gallery images if provided
-		if len(req.NewGallery) > 0 {
-			urls, pids, err := p.UploadMany(ctx, folder, "gallery_"+nameSlug, req.NewGallery, 4)
-			if err != nil {
-				return err
-			}
-
-			imgs := make([]entities.ImageEntity, 0, len(pids))
-			for _, url := range urls {
-				imgs = append(imgs, entities.ImageEntity{
-					ID:        uuid.New(),
-					ImagePath: url,
-				})
-			}
-			if err := p.repo.CreateImages(ctx, imgs); err != nil {
-				return response.NewCustomError(response.ErrInternal, "failed to create new gallery images", 500)
-			}
-
-			pivs := make([]entities.ProductImageEntity, 0, len(imgs))
-			for _, im := range imgs {
-				pivs = append(pivs, entities.ProductImageEntity{
-					ID:        uuid.New(),
-					ProductID: product.ID,
-					ImageID:   im.ID,
-					AltText:   product.Name,
-				})
-			}
-			if err := p.repo.CreateProductImages(ctx, pivs); err != nil {
-				return response.NewCustomError(response.ErrInternal, "failed to create product images", 500)
-			}
+		if err := p.repo.CreateProductImages(ctx, pivs); err != nil {
+			return nil, response.NewCustomError(response.ErrInternal, "failed to create product images", 500)
 		}
-
-		// Save the updated product entity
-		if err := p.repo.Update(ctx, product.ID, product); err != nil {
-			return response.NewCustomError(response.ErrInternal, "failed to update product", 500)
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
 	}
 
-	// Asynchronously delete old images from Cloudinary
+	// ===== Update Product =====
+	if err := p.repo.Update(ctx, product.ID, product); err != nil {
+		return nil, response.NewCustomError(response.ErrInternal, "failed to update product", 500)
+	}
+
+	// Delete old images async
 	if len(toDeletePIDs) > 0 {
-		_ = rabbitmq.PublishToQueue("", "image.delete.q", payload.ImageDeleteTask{PublicIDs: toDeletePIDs})
+		_ = rabbitmq.PublishToQueue("", "image.delete.q", payload.ImageDeleteTask{
+			PublicIDs: toDeletePIDs,
+		})
 	}
 
-	// Invalidate caches
+	// Invalidate cache
 	_ = rabbitmq.PublishToQueue("", rabbitmq.CacheInvalidateQueueName, payload.CacheInvalidateTask{
 		Keys: []string{
-			fmt.Sprintf("product:%s", product.ID),
+			"product:*",
 			"products:*",
 		},
 	})
 
+	// ✅ Pastikan GetByID preload image terbaru
 	return p.repo.GetByID(ctx, product.ID)
 }
 
