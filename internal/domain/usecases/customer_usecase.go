@@ -1154,14 +1154,6 @@ func (v *CustomerService) InvalidateCustomerCache(ctx context.Context) {
 	for cp.Next(ctx) {
 		v.rdb.Del(ctx, cp.Val())
 	}
-	vca := v.rdb.Scan(ctx, 0, "vouchers:*", 0).Iterator()
-	for vca.Next(ctx) {
-		v.rdb.Del(ctx, vca.Val())
-	}
-	vcai := v.rdb.Scan(ctx, 0, "voucher:*", 0).Iterator()
-	for vcai.Next(ctx) {
-		v.rdb.Del(ctx, vcai.Val())
-	}
 	cph := v.rdb.Scan(ctx, 0, "customer_point_history:*", 0).Iterator()
 	for cph.Next(ctx) {
 		v.rdb.Del(ctx, cph.Val())
@@ -1169,6 +1161,16 @@ func (v *CustomerService) InvalidateCustomerCache(ctx context.Context) {
 	vc := v.rdb.Scan(ctx, 0, "customer_vouchers_claimed:*", 0).Iterator()
 	for vc.Next(ctx) {
 		v.rdb.Del(ctx, vc.Val())
+	}
+}
+func (v *CustomerService) InvalidateVoucherCache(ctx context.Context) {
+	vca := v.rdb.Scan(ctx, 0, "vouchers:*", 0).Iterator()
+	for vca.Next(ctx) {
+		v.rdb.Del(ctx, vca.Val())
+	}
+	vcai := v.rdb.Scan(ctx, 0, "voucher:*", 0).Iterator()
+	for vcai.Next(ctx) {
+		v.rdb.Del(ctx, vcai.Val())
 	}
 }
 
@@ -1217,6 +1219,8 @@ func (u *CustomerService) GetCustomerPoint(ctx context.Context, customerID uuid.
 	dataCache, _ := json.Marshal(customerPoint)
 	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
 
+	u.InvalidateVoucherCache(ctx)
+
 	return customerPoint, totalExpired, expiredDate, nil
 }
 
@@ -1242,6 +1246,7 @@ func (u *CustomerService) GetCustomerPointHistory(ctx context.Context, customerI
 	dataCache, _ := json.Marshal(pointHistories)
 	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
 
+	u.InvalidateVoucherCache(ctx)
 	return pointHistories, nil
 }
 
