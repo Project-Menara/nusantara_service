@@ -1154,6 +1154,14 @@ func (v *CustomerService) InvalidateCustomerCache(ctx context.Context) {
 	for cp.Next(ctx) {
 		v.rdb.Del(ctx, cp.Val())
 	}
+	vca := v.rdb.Scan(ctx, 0, "vouchers:*", 0).Iterator()
+	for vca.Next(ctx) {
+		v.rdb.Del(ctx, vca.Val())
+	}
+	vcai := v.rdb.Scan(ctx, 0, "voucher:*", 0).Iterator()
+	for vcai.Next(ctx) {
+		v.rdb.Del(ctx, vcai.Val())
+	}
 	cph := v.rdb.Scan(ctx, 0, "customer_point_history:*", 0).Iterator()
 	for cph.Next(ctx) {
 		v.rdb.Del(ctx, cph.Val())
