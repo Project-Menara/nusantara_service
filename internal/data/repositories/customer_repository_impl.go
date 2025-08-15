@@ -233,7 +233,28 @@ func (u *CustomerRepositoryImpl) FindUserPoint(
 	ctx context.Context,
 	customerID uuid.UUID,
 ) (*entities.UserPointEntity, int, *time.Time, error) {
-	// ambil user_points
+
+	now := time.Now().UTC()
+
+	// 1) AUTO-EXPIRE: ubah point_type ke 'expired' untuk IN yang sudah lewat expired_at.
+	//    Gunakan waktu UTC supaya konsisten.
+	if err := u.db.WithContext(ctx).
+		Model(&entities.UserPointHistoriesEntity{}).
+		Where(`
+			user_id = ? 
+			AND direction = 'in' 
+			AND point_type IN ('reward','purchase','exchange') 
+			AND expired_at IS NOT NULL 
+			AND expired_at < ?
+		`, customerID, now).
+		Updates(map[string]any{
+			"point_type": "expired",
+			"updated_at": now,
+		}).Error; err != nil {
+		return nil, 0, nil, err
+	}
+
+	// 2) Ambil parent user_points (beserta user & role)
 	var userPoint entities.UserPointEntity
 	if err := u.db.WithContext(ctx).
 		Preload("User").
@@ -243,96 +264,144 @@ func (u *CustomerRepositoryImpl) FindUserPoint(
 		return nil, 0, nil, err
 	}
 
-	// total aktif (in - out) untuk tipe yang diizinkan
-	var totalPoints int
-	if err := u.db.WithContext(ctx).
-		Model(&entities.UserPointHistoriesEntity{}).
-		Select("COALESCE(SUM(CASE WHEN direction = 'in' THEN points ELSE -points END), 0)").
-		Where("user_id = ?", customerID).
-		Where("point_type IN ('reward','purchase','exchange')").
-		Scan(&totalPoints).Error; err != nil {
-		return nil, 0, nil, err
-	}
-	userPoint.TotalPoints = totalPoints
-
-	// ambil batch IN (urutkan expired_at paling awal)
+	// 3) Ambil seluruh batch IN (termasuk yang sudah ditandai 'expired') dan semua OUT aktif.
+	//    Kita butuh semua IN agar OUT yang terjadi SEBELUM expired tetap bisa mengonsumsi batch tersebut.
 	var ins []entities.UserPointHistoriesEntity
 	if err := u.db.WithContext(ctx).
-		Where("user_id = ? AND direction = 'in' AND point_type IN ('reward','purchase','exchange')", customerID).
-		// Postgres mendukung NULLS LAST. Jika MySQL, ganti dengan "IS NULL" trick.
-		Order("expired_at ASC NULLS LAST, created_at ASC").
+		Where(`
+			user_id = ? 
+			AND direction = 'in' 
+			AND point_type IN ('reward','purchase','exchange','expired')
+		`, customerID).
+		Order("created_at ASC").
 		Find(&ins).Error; err != nil {
 		return nil, 0, nil, err
 	}
 
-	// ambil batch OUT
 	var outs []entities.UserPointHistoriesEntity
 	if err := u.db.WithContext(ctx).
-		Where("user_id = ? AND direction = 'out' AND point_type IN ('reward','purchase','exchange')", customerID).
+		Where(`
+			user_id = ? 
+			AND direction = 'out' 
+			AND point_type IN ('reward','purchase','exchange')
+		`, customerID).
 		Order("created_at ASC").
 		Find(&outs).Error; err != nil {
 		return nil, 0, nil, err
 	}
 
-	// FIFO: hitung sisa poin untuk tiap batch IN tanpa mengubah nilai aslinya
-	remaining := make([]int, len(ins))
-	for i := range ins {
-		remaining[i] = ins[i].Points
+	// 4) Rekonstruksi FIFO berbasis waktu.
+	type batch struct {
+		remaining int
+		expiredAt *time.Time
+		createdAt time.Time
 	}
+
+	batches := make([]batch, len(ins))
+	for i := range ins {
+		batches[i] = batch{
+			remaining: ins[i].Points,
+			expiredAt: ins[i].ExpiredAt,
+			createdAt: ins[i].CreatedAt,
+		}
+	}
+
+	// helper: expire semua batch yang expired_at <= t (inklusif)
+	expireUpTo := func(t time.Time) {
+		for i := range batches {
+			if batches[i].remaining <= 0 || batches[i].expiredAt == nil {
+				continue
+			}
+			if !batches[i].expiredAt.After(t) {
+				// expired_at <= t  → hanguskan sisa batch
+				batches[i].remaining = 0
+			}
+		}
+	}
+
+	// Proses semua OUT secara kronologis.
 	for _, o := range outs {
+		// 4a) Sebelum OUT terjadi, hanguskan batch yang sudah expired sampai waktu OUT
+		expireUpTo(o.CreatedAt)
+
 		toDeduct := o.Points
-		for j := range remaining {
+
+		// 4b) Deduct hanya dari batch yang SUDAH ADA (created_at <= o.CreatedAt)
+		for j := range batches {
 			if toDeduct <= 0 {
 				break
 			}
-			if remaining[j] > 0 {
-				if remaining[j] > toDeduct {
-					remaining[j] -= toDeduct
+			// batch dari masa depan tidak boleh dipakai
+			if batches[j].createdAt.After(o.CreatedAt) {
+				continue
+			}
+			if batches[j].remaining > 0 {
+				if batches[j].remaining > toDeduct {
+					batches[j].remaining -= toDeduct
 					toDeduct = 0
 				} else {
-					toDeduct -= remaining[j]
-					remaining[j] = 0
+					toDeduct -= batches[j].remaining
+					batches[j].remaining = 0
 				}
+			}
+		}
+		// Catatan: sisa toDeduct (jika > 0) diabaikan → tidak meminjam dari masa depan.
+	}
+
+	// 4c) Setelah semua OUT, hanguskan batch yang expired sampai "sekarang"
+	expireUpTo(now)
+
+	// 5) Hitung total aktif saat ini + nearest expiry
+	totalPoints := 0
+	var nearest *time.Time
+	for i := range batches {
+		if batches[i].remaining <= 0 {
+			continue
+		}
+		totalPoints += batches[i].remaining
+
+		if batches[i].expiredAt != nil && batches[i].expiredAt.After(now) {
+			d := dateOnly(*batches[i].expiredAt)
+			if nearest == nil || d.Before(*nearest) {
+				tmp := d
+				nearest = &tmp
 			}
 		}
 	}
 
-	// cari expired date terdekat dari batch IN yang masih punya sisa poin
-	var nearest *time.Time
-	for i := range ins {
-		if ins[i].ExpiredAt == nil || remaining[i] <= 0 {
-			continue
-		}
-		d := dateOnly(*ins[i].ExpiredAt)
-		if nearest == nil || d.Before(*nearest) {
-			tmp := d
-			nearest = &tmp
+	// 6) Berapa yang akan expired pada tanggal terdekat itu?
+	totalExpiring := 0
+	if nearest != nil {
+		for i := range batches {
+			if batches[i].remaining <= 0 || batches[i].expiredAt == nil {
+				continue
+			}
+			if sameDay(dateOnly(*batches[i].expiredAt), *nearest) {
+				totalExpiring += batches[i].remaining
+			}
 		}
 	}
 
+	// 7) Sinkronkan kolom total_points di tabel user_points
+	if err := u.db.WithContext(ctx).
+		Model(&entities.UserPointEntity{}).
+		Where("user_id = ?", customerID).
+		Update("total_points", totalPoints).Error; err != nil {
+		return nil, 0, nil, err
+	}
+	userPoint.TotalPoints = totalPoints
+
+	// 8) Return
 	if nearest == nil {
-		// tidak ada batch IN dengan expired_at dan sisa poin
 		return &userPoint, 0, nil, nil
 	}
-
-	// total poin yang akan expired pada tanggal terdekat itu (berdasarkan sisa)
-	totalExpiring := 0
-	for i := range ins {
-		if ins[i].ExpiredAt == nil || remaining[i] <= 0 {
-			continue
-		}
-		if sameDay(dateOnly(*ins[i].ExpiredAt), *nearest) {
-			totalExpiring += remaining[i]
-		}
-	}
-
 	return &userPoint, totalExpiring, nearest, nil
 }
 
 func (u *CustomerRepositoryImpl) MarkPointsAsExpired(ctx context.Context, userID uuid.UUID, expiredDate time.Time) error {
 	return u.db.WithContext(ctx).
 		Model(&entities.UserPointHistoriesEntity{}).
-		Where("user_id = ? AND direction = 'in' AND expired_at <= ? AND point_type IN ('reward','expired','exchange')", userID, expiredDate).
+		Where("user_id = ? AND direction = 'in' AND expired_at <= ? AND point_type IN ('reward','exchange')", userID, expiredDate).
 		Update("point_type", "expired").Error
 }
 

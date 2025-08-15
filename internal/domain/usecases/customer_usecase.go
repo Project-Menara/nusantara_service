@@ -1220,6 +1220,7 @@ func (u *CustomerService) GetCustomerPoint(ctx context.Context, customerID uuid.
 	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
 
 	u.InvalidateVoucherCache(ctx)
+	u.InvalidateCustomerCache(ctx)
 
 	return customerPoint, totalExpired, expiredDate, nil
 }
@@ -1247,6 +1248,7 @@ func (u *CustomerService) GetCustomerPointHistory(ctx context.Context, customerI
 	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
 
 	u.InvalidateVoucherCache(ctx)
+	u.InvalidateCustomerCache(ctx)
 	return pointHistories, nil
 }
 
