@@ -30,3 +30,7 @@ type UpdateProductRequest struct {
 	NewGallery     []*multipart.FileHeader `form:"new_gallery" swaggerignore:"true"`
 	ReplaceGallery bool                    `form:"replace_gallery" json:"replace_gallery"`
 }
+
+type UpdatStatusProducRequest struct {
+	Status int `json:"status"`
+}

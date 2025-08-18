@@ -190,3 +190,24 @@ func (p *ProducHandlers) DeleteProduct(c echo.Context) error {
 
 	return response.Success(c, http.StatusOK, "Product deleted successfully", nil)
 }
+
+func (p *ProducHandlers) UpdateStatusProduct(c echo.Context) error {
+	productId, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "inalid id", err.Error())
+	}
+
+	var req dto.UpdatStatusProducRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "failed to bind request", err.Error())
+	}
+
+	if err := p.ProductService.UpdateStatusProduct(c.Request().Context(), productId, req); err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err)
+		}
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update status")
+	}
+
+	return response.Success(c, http.StatusOK, "update status product success", nil)
+}

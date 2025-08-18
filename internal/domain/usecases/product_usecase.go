@@ -135,6 +135,14 @@ func (p *ProductService) CreateProduct(ctx context.Context, userId uuid.UUID, re
 		return nil, response.NewCustomError(response.ErrBadRequest, "status must be 0 or 1", 400)
 	}
 
+	existing, err := p.repo.FindByName(ctx, req.Name)
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if existing != nil {
+		return nil, response.NewCustomError(response.ErrExists, "name already exists", 409)
+	}
+
 	nameSlug := Sanitize(req.Name)
 	folder := "nusantara_service/product"
 
@@ -205,7 +213,7 @@ func (p *ProductService) CreateProduct(ctx context.Context, userId uuid.UUID, re
 	}
 
 	var createdID uuid.UUID
-	err := configs.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = configs.DB.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		coverImg := entities.ImageEntity{
 			ID:        uuid.New(),
 			ImagePath: coverUrl,
@@ -369,6 +377,10 @@ func (p *ProductService) UpdateProduct(
 
 	// Update basic fields
 	if req.Name != nil {
+		existing, _ := p.repo.FindByName(ctx, *req.Name)
+		if existing != nil && existing.ID != req.ID {
+			return nil, response.NewCustomError(response.ErrExists, "name already exists", 409)
+		}
 		product.Name = *req.Name
 	}
 	if req.Code != nil {
@@ -541,4 +553,42 @@ func (p *ProductService) Delete(ctx context.Context, id uuid.UUID) error {
 	})
 
 	return nil
+}
+
+// UpdateStatusProduct implements services.ProductService.
+func (p *ProductService) UpdateStatusProduct(ctx context.Context, productID uuid.UUID, req dto.UpdatStatusProducRequest) error {
+	product, err := p.repo.GetByID(ctx, productID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "product not found", 404)
+		}
+		return err
+	}
+
+	if req.Status < 0 || req.Status > 1 {
+		return response.NewCustomError(response.ErrBadRequest, "status must be 0 or 1", 400)
+	}
+
+	product.Status = req.Status
+
+	err = p.repo.UpdateStatus(ctx, productID, req.Status)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to update status product", 500)
+	}
+
+	p.InvalidateProductCache(ctx)
+
+	return nil
+}
+
+func (b *ProductService) InvalidateProductCache(ctx context.Context) {
+	iter := b.rdb.Scan(ctx, 0, "products:*", 0).Iterator()
+	for iter.Next(ctx) {
+		b.rdb.Del(ctx, iter.Val())
+	}
+
+	iterID := b.rdb.Scan(ctx, 0, "product:*", 0).Iterator()
+	for iterID.Next(ctx) {
+		b.rdb.Del(ctx, iterID.Val())
+	}
 }

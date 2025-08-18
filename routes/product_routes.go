@@ -23,4 +23,5 @@ func ProductRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinary *cl
 	e.GET("/:id", productHandler.GetByIDProduct, middlewares.JWTMiddleware(rdb))
 	e.PUT("/:id/edit", productHandler.UpdateProduct, middlewares.JWTMiddleware(rdb))
 	e.DELETE("/:id/delete", productHandler.DeleteProduct, middlewares.JWTMiddleware(rdb))
+	e.PUT("/:id/edit-status", productHandler.UpdateStatusProduct, middlewares.JWTMiddleware(rdb))
 }

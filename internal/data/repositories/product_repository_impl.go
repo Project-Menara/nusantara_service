@@ -119,3 +119,20 @@ func (p *ProductRepositoryImpl) FindByUserIDSuperAdmin(ctx context.Context, user
 
 	return &user, nil
 }
+
+// FindByName implements repositories.ProductRepository.
+func (p *ProductRepositoryImpl) FindByName(ctx context.Context, name string) (*entities.ProductEntity, error) {
+	var product entities.ProductEntity
+	if err := p.preloadRelations(p.db.WithContext(ctx)).First(&product, "name = ? AND deleted_at IS NULL", name).Error; err != nil {
+		return nil, err
+	}
+
+	return &product, nil
+}
+
+// UpdateStatus implements repositories.ProductRepository.
+func (p *ProductRepositoryImpl) UpdateStatus(ctx context.Context, productID uuid.UUID, status int) error {
+	return p.preloadRelations(p.db.WithContext(ctx)).Model(&entities.ProductEntity{}).
+		Where("id = ?", productID).
+		Update("status", status).Error
+}

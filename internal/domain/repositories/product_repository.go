@@ -13,8 +13,10 @@ type ProductRepository interface {
 	GetAll(ctx context.Context, offset, limit int, search string) ([]*entities.ProductEntity, int, error)
 	Update(ctx context.Context, id uuid.UUID, product *entities.ProductEntity) error
 	Delete(ctx context.Context, id uuid.UUID) error
+	UpdateStatus(ctx context.Context, productID uuid.UUID, status int) error
 
 	FindByUserIDSuperAdmin(ctx context.Context, userID string) (*entities.UserEntity, error)
+	FindByName(ctx context.Context, name string) (*entities.ProductEntity, error)
 
 	//images
 	CreateImages(ctx context.Context, images []entities.ImageEntity) error
