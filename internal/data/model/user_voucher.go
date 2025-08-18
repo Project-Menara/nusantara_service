@@ -10,11 +10,11 @@ import (
 type UserVoucher struct {
 	ID         uuid.UUID         `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	UserID     uuid.UUID         `gorm:"type:uuid;index" json:"user_id"`
-	User       User              `gorm:"foreignKey:UserID"`
+	User       User              `gorm:"foreignKey:UserID;OnDelete:CASCADE"`
 	VoucherID  uuid.UUID         `gorm:"type:uuid;index" json:"voucher_id"`
-	Voucher    Voucher           `gorm:"foreignKey:VoucherID"`
+	Voucher    Voucher           `gorm:"foreignKey:VoucherID;OnDelete:CASCADE"`
 	DetailID   uuid.UUID         `gorm:"type:uuid;index" json:"detail_id"` // Relasi ke snapshot
-	Detail     UserVoucherDetail `gorm:"foreignKey:DetailID"`
+	Detail     UserVoucherDetail `gorm:"foreignKey:DetailID;OnDelete:CASCADE"`
 	IsUsed     bool              `gorm:"default:false" json:"is_used"`
 	RedeemedAt *time.Time        `gorm:"type:timestamp" json:"redeemed_at"`
 	ClaimedAt  time.Time         `gorm:"autoCreateTime" json:"claimed_at"`

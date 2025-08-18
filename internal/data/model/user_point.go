@@ -10,7 +10,7 @@ import (
 type UserPoint struct {
 	ID          uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	UserID      uuid.UUID      `gorm:"type:uuid;uniqueIndex"`
-	User        User           `gorm:"foreignKey:UserID"`
+	User        User           `gorm:"foreignKey:UserID;OnDelete:CASCADE"`
 	TotalPoints int            `gorm:"type:int" json:"total_points"`
 	CreatedAt   time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"autoUpdateTime" json:"updated_at"`

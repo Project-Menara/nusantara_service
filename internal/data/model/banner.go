@@ -14,7 +14,7 @@ type Banner struct {
 	Description string    `gorm:"type:text"`
 	Status      int       `gorm:"type:int;not null"`
 	UserID      uuid.UUID `gorm:"type:uuid"`
-	User        User      `gorm:"foreignKey:UserID"`
+	User        User      `gorm:"foreignKey:UserID;OnDelete:CASCADE"`
 
 	CreatedAt time.Time      `gorm:"autoCreateTime"`
 	UpdatedAt time.Time      `gorm:"autoUpdateTime"`

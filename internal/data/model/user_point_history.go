@@ -10,7 +10,7 @@ import (
 type UserPointHistories struct {
 	ID          uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
 	UserID      uuid.UUID      `gorm:"type:uuid;index" json:"user_id"`
-	User        User           `gorm:"foreignKey:UserID"`
+	User        User           `gorm:"foreignKey:UserID;OnDelete:CASCADE"`
 	PointType   string         `gorm:"type:varchar(100)" json:"point_type"` // reward, purchase, exchange
 	Source      string         `gorm:"type:varchar(255)" json:"source"`
 	SourceId    string         `gorm:"type:varchar(255)" json:"source_id"`
