@@ -9,11 +9,11 @@ import (
 
 type Voucher struct {
 	ID              uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primaryKey" json:"id"`
-	Code            string         `gorm:"type:varchar(50);index" json:"code"` // Contoh: LEBARAN50
-	DiscountAmount  int            `gorm:"type:int" json:"discount_amount"`    // Dalam Rupiah (jika fixed)
-	DiscountPercent int            `gorm:"type:int" json:"discount_percent"`   // Dalam Persen (jika diskon %)
-	MinimumSpend    int            `gorm:"type:int" json:"minimum_spend"`      // Syarat minimal belanja
-	PointCost       int            `gorm:"type:int" json:"point_cost"`         // Poin untuk klaim voucher
+	Code            string         `gorm:"type:varchar(50);index" json:"code"`
+	DiscountAmount  int            `gorm:"type:int" json:"discount_amount"`
+	DiscountPercent int            `gorm:"type:int" json:"discount_percent"`
+	MinimumSpend    int            `gorm:"type:int" json:"minimum_spend"`
+	PointCost       int            `gorm:"type:int" json:"point_cost"`
 	StartDate       time.Time      `gorm:"type:timestamp;index" json:"start_date"`
 	EndDate         time.Time      `gorm:"type:timestamp;index" json:"end_date"`
 	Quota           int            `gorm:"type:int" json:"quota"`
