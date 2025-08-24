@@ -296,6 +296,8 @@ func (p *ProductService) CreateProduct(ctx context.Context, userId uuid.UUID, re
 		Keys: []string{"products:*"},
 	})
 
+	p.InvalidateProductCache(ctx)
+
 	return p.repo.GetByID(ctx, createdID)
 }
 
@@ -512,6 +514,7 @@ func (p *ProductService) UpdateProduct(
 			"products:*",
 		},
 	})
+	p.InvalidateProductCache(ctx)
 
 	// ✅ Pastikan GetByID preload image terbaru
 	return p.repo.GetByID(ctx, product.ID)
@@ -551,6 +554,8 @@ func (p *ProductService) Delete(ctx context.Context, id uuid.UUID) error {
 			"products:*",
 		},
 	})
+
+	p.InvalidateProductCache(ctx)
 
 	return nil
 }
