@@ -25,7 +25,7 @@ func main() {
 
 	e.Use(middlewares.LoggerMiddleware)
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*", "http://localhost:5173", "https://nusantaraweb.vercel.app"},
+		AllowOrigins: []string{"*"},
 		AllowMethods: []string{echo.GET, echo.POST, echo.PUT, echo.DELETE, echo.PATCH},
 	}))
 

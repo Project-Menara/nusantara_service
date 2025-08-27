@@ -31,6 +31,7 @@ type LinkForgotPINPayload struct {
 }
 
 func ConsumeOTPQueue() {
+	log.Println("[*] Waiting for messages in otp_queue")
 	_, err := configs.RabbitChannel.QueueDeclare(
 		"otp_queue", // Nama antrean
 		true,        // Durable

@@ -80,7 +80,7 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 		// if err != nil {
 		// 	return nil, response.NewCustomError(response.ErrInternal, err.Error(), 500)
 		// }
-		_ = rabbitmq.PublishToQueue("otp_code", "otp_queue", consumer.OTPPayload{
+		_ = rabbitmq.PublishToQueue("", "otp_queue", consumer.OTPPayload{
 			Phone: normalized,
 			Code:  otpCode,
 		})
@@ -110,7 +110,7 @@ func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequ
 		// if err != nil {
 		// 	return nil, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
 		// }
-		_ = rabbitmq.PublishToQueue("otp_code", "otp_queue", consumer.OTPPayload{
+		_ = rabbitmq.PublishToQueue("", "otp_queue", consumer.OTPPayload{
 			Phone: normalized,
 			Code:  otpCode,
 		})
@@ -211,7 +211,7 @@ func (u *CustomerService) RegisterCustomer(ctx context.Context, req dto.Register
 	// if err != nil {
 	// 	return nil, 0, response.NewCustomError(response.ErrInternal, "failed to send OTP", 500)
 	// }
-	_ = rabbitmq.PublishToQueue("otp_code", "otp_queue", consumer.OTPPayload{
+	_ = rabbitmq.PublishToQueue("", "otp_queue", consumer.OTPPayload{
 		Phone: normalizedPhone,
 		Code:  otpCode,
 	})
@@ -244,7 +244,7 @@ func (u *CustomerService) ResendCodeOTPVerify(ctx context.Context, req dto.Resen
 		return response.NewCustomError(response.ErrInternal, "failed to store OTP", 500)
 	}
 
-	err = rabbitmq.PublishToQueue("otp_code", "otp_queue", consumer.OTPPayload{
+	err = rabbitmq.PublishToQueue("", "otp_queue", consumer.OTPPayload{
 		Phone: *user.Phone,
 		Code:  otpCode,
 	})
@@ -843,7 +843,7 @@ func (u *CustomerService) NewPhoneCustomer(ctx context.Context, userId string, r
 		return response.NewCustomError(response.ErrInternal, "failed to store OTP", 500)
 	}
 
-	err = rabbitmq.PublishToQueue("otp_code", "otp_queue", consumer.OTPPayload{
+	err = rabbitmq.PublishToQueue("", "otp_queue", consumer.OTPPayload{
 		Phone: normalized,
 		Code:  otpCode,
 	})
