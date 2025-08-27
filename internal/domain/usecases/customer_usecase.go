@@ -921,7 +921,7 @@ func (u *CustomerService) FogotPIN(ctx context.Context, req dto.ForgotPINRequest
 	// if err != nil {
 	// 	return "", response.NewCustomError(response.ErrInternal, "failed to send message link", 500)
 	// }
-	_ = rabbitmq.PublishToQueue("forgot_pin", rabbitmq.LinkForgotPINQueueName, consumer.LinkForgotPINPayload{
+	_ = rabbitmq.PublishToQueue("", rabbitmq.LinkForgotPINQueueName, consumer.LinkForgotPINPayload{
 		Phone: normalized,
 		Link:  message,
 	})
