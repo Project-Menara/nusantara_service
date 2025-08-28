@@ -244,13 +244,10 @@ func (u *CustomerService) ResendCodeOTPVerify(ctx context.Context, req dto.Resen
 		return response.NewCustomError(response.ErrInternal, "failed to store OTP", 500)
 	}
 
-	err = rabbitmq.PublishToQueue("", "otp_queue", consumer.OTPPayload{
+	_ = rabbitmq.PublishToQueue("", "otp_queue", consumer.OTPPayload{
 		Phone: *user.Phone,
 		Code:  otpCode,
 	})
-	if err != nil {
-		return response.NewCustomError(response.ErrInternal, "failed to initiate OTP resend", 500)
-	}
 
 	return nil
 }
