@@ -9,4 +9,5 @@ func StartWorkers() {
 
 	go consumer.ConsumeImageDeleteQueue()
 	go consumer.ConsumeCacheInvalidateQueue()
+	go consumer.SendImageQueue()
 }

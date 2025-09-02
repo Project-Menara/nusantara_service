@@ -6,7 +6,7 @@ import (
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
-	"nusantara_service/internal/dto"
+	dto "nusantara_service/internal/dto/request"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"

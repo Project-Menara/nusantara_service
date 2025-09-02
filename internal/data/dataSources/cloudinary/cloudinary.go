@@ -1,10 +1,10 @@
-// infra/cloudinary/service.go
 package cloudinary
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"os"
 
@@ -20,6 +20,7 @@ type UploadResult struct {
 type CloudinaryService interface {
 	UploadImage(ctx context.Context, file *multipart.FileHeader, folder, filename string) (*UploadResult, error)
 	DestroyImage(ctx context.Context, publicID string) error
+	UploadImageBytes(ctx context.Context, file io.Reader, folder, filename string) (*UploadResult, error)
 }
 
 type cloudinaryServiceImpl struct {
@@ -72,6 +73,20 @@ func (c *cloudinaryServiceImpl) DestroyImage(ctx context.Context, publicID strin
 		return fmt.Errorf("deletion result: %s", resp.Result)
 	}
 	return nil
+}
+
+func (c *cloudinaryServiceImpl) UploadImageBytes(ctx context.Context, file io.Reader, folder, filename string) (*UploadResult, error) {
+	publicID := fmt.Sprintf("%s/%s", folder, filename)
+	resp, err := c.cld.Upload.Upload(ctx, file, uploader.UploadParams{
+		PublicID:     publicID,
+		Folder:       folder,
+		Overwrite:    boolPtr(true),
+		ResourceType: "image",
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &UploadResult{URL: resp.SecureURL, PublicID: resp.PublicID}, nil
 }
 
 func boolPtr(b bool) *bool { return &b }

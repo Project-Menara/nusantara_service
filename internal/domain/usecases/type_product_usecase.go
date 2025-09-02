@@ -11,7 +11,7 @@ import (
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
-	"nusantara_service/internal/dto"
+	dto "nusantara_service/internal/dto/request"
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
 	"strings"

@@ -50,5 +50,4 @@ func main() {
 		port = "8080"
 	}
 	log.Fatal(e.Start(":" + port))
-
 }

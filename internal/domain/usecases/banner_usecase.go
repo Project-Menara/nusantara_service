@@ -11,7 +11,7 @@ import (
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
-	"nusantara_service/internal/dto"
+	dto "nusantara_service/internal/dto/request"
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
 	"strings"
@@ -280,6 +280,10 @@ func (b *BannerService) InvalidateBannerCache(ctx context.Context) {
 	iterID := b.rdb.Scan(ctx, 0, "banner:*", 0).Iterator()
 	for iterID.Next(ctx) {
 		b.rdb.Del(ctx, iterID.Val())
+	}
+	iterCust := b.rdb.Scan(ctx, 0, "banner_customer:*", 0).Iterator()
+	for iterCust.Next(ctx) {
+		b.rdb.Del(ctx, iterCust.Val())
 	}
 }
 
