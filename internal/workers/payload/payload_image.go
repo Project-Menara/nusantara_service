@@ -18,3 +18,11 @@ type ImageSendTask struct {
 	Folder    string    `json:"folder"`
 	Filename  string    `json:"filename"`
 }
+
+type ImageUploadPayload struct {
+	ShopID    uuid.UUID `json:"shop_id"`
+	Type      string    `json:"type"` // "cover" atau "gallery"
+	FileBytes []byte    `json:"file_bytes"`
+	Folder    string    `json:"folder"`
+	Filename  string    `json:"filename"`
+}

@@ -1,6 +1,9 @@
 package producer
 
-import "nusantara_service/internal/workers/consumer"
+import (
+	"nusantara_service/internal/workers/consumer"
+	shopconsumer "nusantara_service/internal/workers/consumer/Shop_Consumer"
+)
 
 func StartWorkers() {
 	go consumer.ConsumeOTPQueue()
@@ -10,4 +13,5 @@ func StartWorkers() {
 	go consumer.ConsumeImageDeleteQueue()
 	go consumer.ConsumeCacheInvalidateQueue()
 	go consumer.SendImageQueue()
+	go shopconsumer.StartImageUploadConsumer()
 }

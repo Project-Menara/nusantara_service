@@ -11,6 +11,7 @@ var (
 	ErrExists       = errors.New("already exists")
 	ErrInternal     = errors.New("internal server error")
 	ErrUnauthorized = errors.New("unauthorized")
+	ErrForbidden    = errors.New("forbidden")
 )
 
 type CustomError struct {

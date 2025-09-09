@@ -20,5 +20,10 @@ func RunMigrations(db *gorm.DB) error {
 		&model.Image{},
 		&model.Product{},
 		&model.ProductImage{},
+		&model.Shop{},
+		&model.ShopCashier{},
+		&model.ShopProducts{},
+		&model.ShopImage{},
+		&model.CustomerAddress{},
 	)
 }
