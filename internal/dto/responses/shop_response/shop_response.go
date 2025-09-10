@@ -1,6 +1,7 @@
 package shopresponse
 
 import (
+	"fmt"
 	"nusantara_service/internal/domain/entities"
 	cashierresponse "nusantara_service/internal/dto/responses/cashier_response"
 	productresponse "nusantara_service/internal/dto/responses/product_response"
@@ -62,5 +63,17 @@ func ToShopResponse(shop entities.ShopEntity) ShopResponse {
 		ShopImages:   shopImages,
 		ShopProducts: shopProducts,
 		ShopCashier:  shopCashiers,
+	}
+}
+
+type ShopNearbyResponse struct {
+	ShopResponse
+	Distance string `json:"distance"`
+}
+
+func ToShopNearbyResponse(shop entities.ShopEntity, distance float64) ShopNearbyResponse {
+	return ShopNearbyResponse{
+		ShopResponse: ToShopResponse(shop),
+		Distance:     fmt.Sprintf("%.2f Km", distance),
 	}
 }
