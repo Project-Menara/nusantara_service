@@ -58,7 +58,11 @@ func (c *CustomerAddressRepositoryImpl) FindByID(ctx context.Context, id uuid.UU
 func (c *CustomerAddressRepositoryImpl) FindByUser(ctx context.Context, userID uuid.UUID) ([]*entities.CustomerAddressEntity, error) {
 	var list []*entities.CustomerAddressEntity
 
-	if err := c.preloadRelations(c.db.WithContext(ctx)).Where("user_id = ?", userID).Find(&list).Error; err != nil {
+	if err := c.preloadRelations(c.db.WithContext(ctx)).
+		Where("user_id = ?", userID).
+		Order("is_default DESC").
+		Order("created_at DESC").
+		Find(&list).Error; err != nil {
 		return nil, err
 	}
 
