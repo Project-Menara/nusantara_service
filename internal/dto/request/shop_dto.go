@@ -25,8 +25,8 @@ type UpdateShopRequest struct {
 	FullAddress    string                  `form:"full_address" json:"full_address"`
 	Lat            float64                 `form:"lat" json:"lat"`
 	Lng            float64                 `form:"lang" json:"lang"`
-	NewCover       *multipart.FileHeader   `form:"new_cover" swaggerignore:"true"`
-	NewGallery     []*multipart.FileHeader `form:"new_gallery" swaggerignore:"true"`
+	NewCover       *multipart.FileHeader   `form:"cover" swaggerignore:"true"`
+	NewGallery     []*multipart.FileHeader `form:"gallery" swaggerignore:"true"`
 	ReplaceGallery bool                    `form:"replace_gallery" json:"replace_gallery"`
 
 	// optional: replace assignments when present

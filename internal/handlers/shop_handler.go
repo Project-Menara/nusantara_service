@@ -171,7 +171,7 @@ func (s *ShopHandler) UpdateShop(c echo.Context) error {
 	}
 
 	// New cover
-	if newCover, err := c.FormFile("new_cover"); err == nil {
+	if newCover, err := c.FormFile("cover"); err == nil {
 		req.NewCover = newCover
 	}
 
@@ -179,7 +179,7 @@ func (s *ShopHandler) UpdateShop(c echo.Context) error {
 	newGallery := []*multipart.FileHeader{}
 	formGallery, _ := c.MultipartForm()
 	if formGallery != nil {
-		if files, ok := formGallery.File["new_gallery"]; ok {
+		if files, ok := formGallery.File["gallery"]; ok {
 			newGallery = files
 		}
 	}
