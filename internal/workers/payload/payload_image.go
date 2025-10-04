@@ -26,3 +26,10 @@ type ImageUploadPayload struct {
 	Folder    string    `json:"folder"`
 	Filename  string    `json:"filename"`
 }
+type ImageEventUploadPayload struct {
+	EventID   uuid.UUID `json:"event_id"`
+	Type      string    `json:"type"`
+	FileBytes []byte    `json:"file_bytes"`
+	Folder    string    `json:"folder"`
+	Filename  string    `json:"filename"`
+}

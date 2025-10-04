@@ -25,5 +25,9 @@ func RunMigrations(db *gorm.DB) error {
 		&model.ShopProducts{},
 		&model.ShopImage{},
 		&model.CustomerAddress{},
+		&model.Event{},
+		&model.EventProduct{},
+		&model.EventBundleBuy{},
+		&model.EventBundleReward{},
 	)
 }
