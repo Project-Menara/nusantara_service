@@ -19,4 +19,6 @@ func EventRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cld *cloudinary.
 	eventHandler := handlers.NewEventHandler(eventService)
 
 	e.POST("/create", eventHandler.CreateEvent, middlewares.JWTMiddleware(rdb))
+	e.GET("", eventHandler.GetAllEvents, middlewares.JWTMiddleware(rdb))
+	e.GET("/:id", eventHandler.GetEventById, middlewares.JWTMiddleware(rdb))
 }

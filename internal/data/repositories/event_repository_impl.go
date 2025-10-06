@@ -131,3 +131,23 @@ func (e *EventRepositoryImpl) FindById(ctx context.Context, id uuid.UUID) (*enti
 	}
 	return &event, nil
 }
+
+// FindAll implements repositories.EventRepository.
+func (e *EventRepositoryImpl) FindAll(ctx context.Context, offset int, limit int, search string) ([]*entities.EventEntity, int, error) {
+	var (
+		events []*entities.EventEntity
+		count  int64
+	)
+
+	query := e.preloadRelations(e.db.WithContext(ctx).Model(&entities.EventEntity{})).Where("deleted_at IS NULL")
+	if search != "" {
+		query = query.Where("name ILIKE ?", "%"+search+"%")
+	}
+	if err := query.Count(&count).Error; err != nil {
+		return nil, 0, err
+	}
+	if err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&events).Error; err != nil {
+		return nil, 0, err
+	}
+	return events, int(count), nil
+}

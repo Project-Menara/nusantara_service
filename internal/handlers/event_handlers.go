@@ -6,7 +6,9 @@ import (
 	"nusantara_service/internal/data/services"
 	"nusantara_service/internal/domain/entities"
 	dto "nusantara_service/internal/dto/request"
+	eventresponse "nusantara_service/internal/dto/responses/event_response"
 	"nusantara_service/internal/response"
+	"nusantara_service/internal/utils"
 	"strconv"
 	"time"
 
@@ -111,4 +113,40 @@ func (e *EventHandler) CreateEvent(c echo.Context) error {
 
 	return response.Success(c, http.StatusCreated, "created event success", nil)
 
+}
+
+func (e *EventHandler) GetAllEvents(c echo.Context) error {
+	pageInt, limitInt := utils.ParsePaginationParams(c, 10)
+	search := c.QueryParam("search")
+
+	events, total, err := e.service.GetAllEvents(c.Request().Context(), pageInt, limitInt, search)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get events")
+	}
+
+	meta := utils.BuildPaginationMeta(c, pageInt, limitInt, total)
+	data := make([]eventresponse.EventResponse, len(events))
+	for i, e := range events {
+		data[i] = eventresponse.ToEventResponse(*e)
+	}
+
+	return response.PaginatedSuccess(c, http.StatusOK, "Events Retrieved Successfully", data, meta)
+}
+
+func (e *EventHandler) GetEventById(c echo.Context) error {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
+	}
+	event, err := e.service.GetEventById(c.Request().Context(), id)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get event")
+	}
+	return response.Success(c, http.StatusOK, "Event Retrieved Successfully", eventresponse.ToEventResponse(*event))
 }

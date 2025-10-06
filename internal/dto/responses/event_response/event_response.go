@@ -25,7 +25,7 @@ type EventResponse struct {
 	DeletedAt          gorm.DeletedAt              `json:"deleted_at"`
 }
 
-func ToEventResponse(event *entities.EventEntity) EventResponse {
+func ToEventResponse(event entities.EventEntity) EventResponse {
 	eventProducts := []EventProductResponse{}
 	for _, event_product := range event.EventProducts {
 		event_product_res := ToEventProductResponse(event_product)

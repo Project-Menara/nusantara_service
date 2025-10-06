@@ -2,10 +2,12 @@ package usecases
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"nusantara_service/configs"
 	"nusantara_service/internal/data/dataSources/cloudinary"
 	"nusantara_service/internal/data/dataSources/rabbitmq"
 	"nusantara_service/internal/data/model"
@@ -16,6 +18,7 @@ import (
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/workers/payload"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -198,4 +201,57 @@ func (e *EventService) CreateEvent(ctx context.Context, superAdminId uuid.UUID, 
 	}
 	e.invalidateEventCache(ctx)
 	return nil
+}
+
+// GetAllEvents implements services.EventService.
+func (e *EventService) GetAllEvents(ctx context.Context, page int, limit int, search string) ([]*entities.EventEntity, int, error) {
+	cacheKey := fmt.Sprintf("shops:search:%s:page:%d:limit:%d", search, page, limit)
+	if cached, err := configs.GetRedis(ctx, cacheKey); err == nil && len(cached) > 0 {
+		var result struct {
+			Data  []*entities.EventEntity `json:"data"`
+			Total int                     `json:"total"`
+		}
+		if json.Unmarshal([]byte(cached), &result) == nil {
+			return result.Data, result.Total, nil
+		}
+	}
+
+	offset := (page - 1) * limit
+	events, total, err := e.eventRepo.FindAll(ctx, offset, limit, search)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, 0, response.NewCustomError(response.ErrNotFound, "events not found", 404)
+		}
+		return nil, 0, response.NewCustomError(response.ErrInternal, "failed to fetch events", 500)
+	}
+
+	buf, _ := json.Marshal(map[string]any{
+		"data":  events,
+		"total": total,
+	})
+	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*30)
+	return events, total, nil
+}
+
+// GetEventById implements services.EventService.
+func (e *EventService) GetEventById(ctx context.Context, id uuid.UUID) (*entities.EventEntity, error) {
+	cacheKey := fmt.Sprintf("event:%s", id)
+	if cached, err := configs.GetRedis(ctx, cacheKey); err == nil && len(cached) > 0 {
+		var event entities.EventEntity
+		if json.Unmarshal([]byte(cached), &event) == nil {
+			return &event, nil
+		}
+	}
+
+	event, err := e.eventRepo.FindById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "event not found", 404)
+		}
+		return nil, response.NewCustomError(response.ErrInternal, "failed to fetch event", 500)
+	}
+
+	buf, _ := json.Marshal(event)
+	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*30)
+	return event, nil
 }
