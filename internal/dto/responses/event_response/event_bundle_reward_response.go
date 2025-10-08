@@ -19,7 +19,7 @@ type EventBundleRewardResponse struct {
 	DeletedAt gorm.DeletedAt                  `json:"deleted_at"`
 }
 
-func ToEventBundleRewardResponse(ebr entities.EventBundleRewardEntity) EventBundleRewardResponse {
+func ToEventBundleRewardResponse(ebr *entities.EventBundleRewardEntity) EventBundleRewardResponse {
 	return EventBundleRewardResponse{
 		ID:        ebr.ID,
 		Event:     ebr.Event.Name,

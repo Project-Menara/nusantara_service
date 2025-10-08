@@ -33,12 +33,12 @@ func ToEventResponse(event entities.EventEntity) EventResponse {
 	}
 	eventBundleBuys := []EventBundleBuyResponse{}
 	for _, event_bundle_buy := range event.EventBundleBuys {
-		event_bundle_buy_res := ToEvenBundleBuyResponse(event_bundle_buy)
+		event_bundle_buy_res := ToEvenBundleBuyResponse(&event_bundle_buy)
 		eventBundleBuys = append(eventBundleBuys, event_bundle_buy_res)
 	}
 	eventBundleRewards := []EventBundleRewardResponse{}
 	for _, event_bundle_reward := range event.EventBundleRewards {
-		event_bundle_reward_res := ToEventBundleRewardResponse(event_bundle_reward)
+		event_bundle_reward_res := ToEventBundleRewardResponse(&event_bundle_reward)
 		eventBundleRewards = append(eventBundleRewards, event_bundle_reward_res)
 	}
 	switch event.TypeEvent {

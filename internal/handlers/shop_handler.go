@@ -247,7 +247,7 @@ func (s *ShopHandler) UpdateStatusShop(c echo.Context) error {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to delete shop")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to update status shop")
 	}
 
 	return response.Success(c, http.StatusOK, "update status success", nil)

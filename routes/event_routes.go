@@ -21,4 +21,7 @@ func EventRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cld *cloudinary.
 	e.POST("/create", eventHandler.CreateEvent, middlewares.JWTMiddleware(rdb))
 	e.GET("", eventHandler.GetAllEvents, middlewares.JWTMiddleware(rdb))
 	e.GET("/:id", eventHandler.GetEventById, middlewares.JWTMiddleware(rdb))
+	e.PUT("/:id/edit", eventHandler.UpdateEvent, middlewares.JWTMiddleware(rdb))
+	e.DELETE("/:id/delete", eventHandler.DeleteEvent, middlewares.JWTMiddleware(rdb))
+	e.PUT("/:id/edit-status", eventHandler.UpdateStatusEvent, middlewares.JWTMiddleware(rdb))
 }

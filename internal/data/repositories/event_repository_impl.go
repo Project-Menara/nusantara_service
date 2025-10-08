@@ -25,18 +25,21 @@ func (e *EventRepositoryImpl) preloadRelations(db *gorm.DB) *gorm.DB {
 		Preload("EventProducts.Product.TypeProduct").
 		Preload("EventProducts.Product.User").
 		Preload("EventProducts.Product.User.Role").
+		Preload("EventProducts.Event").
 		Preload("EventBundleBuys.Product").
 		Preload("EventBundleBuys.Product.Image").
 		Preload("EventBundleBuys.Product.ProductImages.Image").
 		Preload("EventBundleBuys.Product.TypeProduct").
 		Preload("EventBundleBuys.Product.User").
 		Preload("EventBundleBuys.Product.User.Role").
+		Preload("EventBundleBuys.Event").
 		Preload("EventBundleRewards.Product").
 		Preload("EventBundleRewards.Product.Image").
 		Preload("EventBundleRewards.Product.ProductImages.Image").
 		Preload("EventBundleRewards.Product.TypeProduct").
 		Preload("EventBundleRewards.Product.User").
 		Preload("EventBundleRewards.Product.User.Role").
+		Preload("EventBundleRewards.Event").
 		Preload("User").
 		Preload("User.Role")
 }
@@ -150,4 +153,36 @@ func (e *EventRepositoryImpl) FindAll(ctx context.Context, offset int, limit int
 		return nil, 0, err
 	}
 	return events, int(count), nil
+}
+
+// Update implements repositories.EventRepository.
+func (e *EventRepositoryImpl) Update(ctx context.Context, id uuid.UUID, data *entities.EventEntity) error {
+	return e.preloadRelations(e.db.WithContext(ctx)).Save(data).Error
+}
+
+// Delete implements repositories.EventRepository.
+func (e *EventRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
+	return e.db.WithContext(ctx).Delete(&entities.EventEntity{}, "id = ?", id).Error
+}
+
+// UpdateStatus implements repositories.EventRepository.
+func (e *EventRepositoryImpl) UpdateStatus(ctx context.Context, id uuid.UUID, status int) error {
+	return e.preloadRelations(e.db.WithContext(ctx)).Model(&entities.EventEntity{}).
+		Where("id = ?", id).
+		Update("status", status).Error
+}
+
+// DeleteEventBundleBuysByEventID implements repositories.EventRepository.
+func (e *EventRepositoryImpl) DeleteEventBundleBuysByEventID(ctx context.Context, eventID uuid.UUID) error {
+	return e.db.WithContext(ctx).Where("event_id = ?", eventID).Delete(&entities.EventBundleBuyEntity{}).Error
+}
+
+// DeleteEventBundleRewardsByEventID implements repositories.EventRepository.
+func (e *EventRepositoryImpl) DeleteEventBundleRewardsByEventID(ctx context.Context, eventID uuid.UUID) error {
+	return e.db.WithContext(ctx).Where("event_id = ?", eventID).Delete(&entities.EventBundleRewardEntity{}).Error
+}
+
+// DeleteEventProductsByEventID implements repositories.EventRepository.
+func (e *EventRepositoryImpl) DeleteEventProductsByEventID(ctx context.Context, eventID uuid.UUID) error {
+	return e.db.WithContext(ctx).Where("event_id = ?", eventID).Delete(&entities.EventProductEntity{}).Error
 }

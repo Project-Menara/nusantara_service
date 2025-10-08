@@ -16,6 +16,7 @@ import (
 	"nusantara_service/internal/domain/repositories"
 	dto "nusantara_service/internal/dto/request"
 	"nusantara_service/internal/response"
+	"nusantara_service/internal/utils"
 	"nusantara_service/internal/workers/payload"
 	"strings"
 	"time"
@@ -205,7 +206,7 @@ func (e *EventService) CreateEvent(ctx context.Context, superAdminId uuid.UUID, 
 
 // GetAllEvents implements services.EventService.
 func (e *EventService) GetAllEvents(ctx context.Context, page int, limit int, search string) ([]*entities.EventEntity, int, error) {
-	cacheKey := fmt.Sprintf("shops:search:%s:page:%d:limit:%d", search, page, limit)
+	cacheKey := fmt.Sprintf("events:search:%s:page:%d:limit:%d", search, page, limit)
 	if cached, err := configs.GetRedis(ctx, cacheKey); err == nil && len(cached) > 0 {
 		var result struct {
 			Data  []*entities.EventEntity `json:"data"`
@@ -254,4 +255,172 @@ func (e *EventService) GetEventById(ctx context.Context, id uuid.UUID) (*entitie
 	buf, _ := json.Marshal(event)
 	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*30)
 	return event, nil
+}
+
+// UpdateEntity implements services.EventService.
+func (e *EventService) UpdateEvent(ctx context.Context, superAdminId uuid.UUID, id uuid.UUID, req dto.UpdateEventRequest) error {
+	event, err := e.eventRepo.FindById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "event not found", 404)
+		}
+		return response.NewCustomError(response.ErrInternal, "failed to fetch event", 500)
+	}
+
+	if req.Name != "" {
+		event.Name = req.Name
+	}
+	if req.Type != "" {
+		event.TypeEvent = entities.EventType(strings.ToUpper(req.Type))
+	}
+	if !req.StartDate.IsZero() {
+		event.StartDate = req.StartDate
+	}
+	if !req.EndDate.IsZero() && !req.EndDate.Before(event.StartDate) {
+		event.EndDate = req.EndDate
+	}
+
+	if req.NewCover != nil {
+		if event.Cover != "" {
+			publicId := utils.ExtractPublicIDFromCloudinaryURL(event.Cover)
+			if publicId != "" {
+				_ = e.cld.DestroyImage(ctx, publicId)
+			}
+		}
+		if bin, err := fileEventToBytes(req.NewCover); err == nil && len(bin) > 0 {
+			task := payload.ImageEventUploadPayload{
+				EventID:   event.ID,
+				Type:      "cover",
+				FileBytes: bin,
+				Folder:    "nusantara_service/events",
+				Filename:  fmt.Sprintf("event_%s_cover", event.ID.String()),
+			}
+			_ = rabbitmq.PublishToQueue("", rabbitmq.SendImageEventQueueName, task)
+		}
+	}
+
+	eventType := req.Type
+	if eventType == "" {
+		eventType = string(event.TypeEvent)
+	}
+
+	switch eventType {
+	case string(entities.EventTypeDiskon):
+		if len(req.EventProducts) > 0 {
+			_ = e.eventRepo.DeleteEventProductsByEventID(ctx, event.ID)
+
+			var eventProducts []entities.EventProductEntity
+			for _, ep := range req.EventProducts {
+				product, err := e.productRepo.GetByID(ctx, ep.ProductID)
+				if err != nil {
+					return response.NewCustomError(response.ErrNotFound, "product id "+ep.ProductID.String()+" not found", 404)
+				}
+				discount_amount := (ep.DiscountPercent * product.Price) / 100
+
+				eventProducts = append(eventProducts, entities.EventProductEntity{
+					ID:              uuid.New(),
+					EventID:         event.ID,
+					ProductID:       ep.ProductID,
+					DiscountPercent: ep.DiscountPercent,
+					DiscountAmount:  float64(discount_amount),
+				})
+			}
+			if len(eventProducts) > 0 {
+				if err := e.eventRepo.AssignEventProduct(ctx, event.ID, eventProducts); err != nil {
+					return response.NewCustomError(response.ErrInternal, "failed to create event products", 500)
+				}
+			}
+		}
+	case string(entities.EventTypeBundle):
+		if len(req.EventBundleBuys) > 0 {
+			_ = e.eventRepo.DeleteEventBundleBuysByEventID(ctx, event.ID)
+			var eventBundleBuys []entities.EventBundleBuyEntity
+			for _, ebb := range req.EventBundleBuys {
+				_, err := e.productRepo.GetByID(ctx, ebb.ProductID)
+				if err != nil {
+					return response.NewCustomError(response.ErrNotFound, "product id "+ebb.ProductID.String()+" not found", 404)
+				}
+				eventBundleBuys = append(eventBundleBuys, entities.EventBundleBuyEntity{
+					ID:        uuid.New(),
+					EventID:   event.ID,
+					ProductID: ebb.ProductID,
+					Quantity:  ebb.Quantity,
+				})
+			}
+			if len(eventBundleBuys) > 0 {
+				if err := e.eventRepo.AssignEventBundleBuy(ctx, event.ID, eventBundleBuys); err != nil {
+					return response.NewCustomError(response.ErrInternal, "failed to create event bundle buys", 500)
+				}
+			}
+		}
+		if len(req.EventBundleRewards) > 0 {
+			_ = e.eventRepo.DeleteEventBundleRewardsByEventID(ctx, event.ID)
+			var eventBundleRewards []entities.EventBundleRewardEntity
+			for _, ebw := range req.EventBundleRewards {
+				_, err := e.productRepo.GetByID(ctx, ebw.ProductID)
+				if err != nil {
+					return response.NewCustomError(response.ErrNotFound, "product id "+ebw.ProductID.String()+" not found", 404)
+				}
+				eventBundleRewards = append(eventBundleRewards, entities.EventBundleRewardEntity{
+					ID:        uuid.New(),
+					EventID:   event.ID,
+					ProductID: ebw.ProductID,
+					Quantity:  ebw.Quantity,
+				})
+			}
+			if len(eventBundleRewards) > 0 {
+				if err := e.eventRepo.AssignEventBundleReward(ctx, event.ID, eventBundleRewards); err != nil {
+					return response.NewCustomError(response.ErrInternal, "failed to create event bundle rewards", 500)
+				}
+			}
+		}
+	}
+	event.UpdatedAt = time.Now()
+	if err := e.eventRepo.Update(ctx, event.ID, event); err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to update event", 500)
+	}
+	e.invalidateEventCache(ctx)
+	return nil
+}
+
+// Delete implements services.EventService.
+func (e *EventService) DeleteEvent(ctx context.Context, id uuid.UUID) error {
+	event, err := e.eventRepo.FindById(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "event not found", 404)
+		}
+		return response.NewCustomError(response.ErrInternal, "failed to fetch event", 500)
+	}
+
+	if event.Cover != "" {
+		publicID := utils.ExtractPublicIDFromCloudinaryURL(event.Cover)
+		if publicID != "" {
+			if err := e.cld.DestroyImage(ctx, publicID); err != nil {
+				return response.NewCustomError(response.ErrInternal, "failed to delete image", 500)
+			}
+		}
+	}
+
+	err = e.eventRepo.Delete(ctx, event.ID)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to delete event", 500)
+	}
+
+	e.invalidateEventCache(ctx)
+	return nil
+}
+
+// UpdateStatusEvent implements services.EventService.
+func (e *EventService) UpdateStatusEvent(ctx context.Context, id uuid.UUID, req dto.UpdateStatusEventRequest) error {
+	if req.Status < 0 || req.Status > 1 {
+		return response.NewCustomError(response.ErrBadRequest, "status must be 0 or 1", 400)
+	}
+
+	if err := e.eventRepo.UpdateStatus(ctx, id, req.Status); err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to update status", 500)
+	}
+
+	e.invalidateEventCache(ctx)
+	return nil
 }

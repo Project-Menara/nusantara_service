@@ -18,4 +18,10 @@ type EventRepository interface {
 	UpdateEventCover(ctx context.Context, eventID uuid.UUID, coverURL string) error
 	FindById(ctx context.Context, id uuid.UUID) (*entities.EventEntity, error)
 	FindAll(ctx context.Context, offset, limit int, search string) ([]*entities.EventEntity, int, error)
+	Update(ctx context.Context, id uuid.UUID, data *entities.EventEntity) error
+	Delete(ctx context.Context, id uuid.UUID) error
+	UpdateStatus(ctx context.Context, id uuid.UUID, status int) error
+	DeleteEventProductsByEventID(ctx context.Context, eventID uuid.UUID) error
+	DeleteEventBundleBuysByEventID(ctx context.Context, eventID uuid.UUID) error
+	DeleteEventBundleRewardsByEventID(ctx context.Context, eventID uuid.UUID) error
 }
