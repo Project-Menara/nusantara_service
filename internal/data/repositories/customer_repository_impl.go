@@ -4,6 +4,7 @@ import (
 	"context"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
+	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"time"
 
 	"github.com/google/uuid"
@@ -435,4 +436,64 @@ func (u *CustomerRepositoryImpl) FindUserVoucherClaimed(ctx context.Context, use
 	}
 
 	return vouchers, nil
+}
+
+// FindShopById implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) FindShopById(ctx context.Context, offset int, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error) {
+	var shop entities.ShopEntity
+	var totalProducts int64
+	countQuery := u.db.WithContext(ctx).Model(&entities.ShopProductEntity{}).
+		Where("shop_id = ?", shopID)
+
+	if search != "" || typeID != uuid.Nil {
+		countQuery = countQuery.
+			Joins("JOIN products ON shop_products.product_id = products.id")
+	}
+
+	if search != "" {
+		countQuery = countQuery.Where("products.name ILIKE ?", "%"+search+"%")
+	}
+	if typeID != uuid.Nil {
+		countQuery = countQuery.Where("products.type_product_id = ?", typeID)
+	}
+
+	if err := countQuery.Count(&totalProducts).Error; err != nil {
+		return nil, 0, err
+	}
+
+	productScope := func(db *gorm.DB) *gorm.DB {
+		if search != "" || typeID != uuid.Nil {
+			db = db.
+				Joins("JOIN products ON products.id = shop_products.product_id")
+		}
+
+		if search != "" {
+			db = db.Where("products.name ILIKE ?", "%"+search+"%")
+		}
+		if typeID != uuid.Nil {
+			db = db.Where("products.type_product_id = ?", typeID)
+		}
+
+		if limit > 0 {
+			db = db.Limit(limit).Offset(offset)
+		}
+		return db
+	}
+
+	if err := u.db.WithContext(ctx).
+		Preload("ShopImages.Image").
+		Preload("ShopProducts", productScope).
+		Preload("ShopProducts.Product").
+		Preload("ShopProducts.Product.Image").
+		Preload("ShopProducts.Product.ProductImages.Image").
+		Preload("ShopProducts.Product.TypeProduct").
+		Preload("ShopProducts.Product.User").
+		First(&shop, "id = ?", shopID).Error; err != nil {
+
+		return nil, 0, err
+	}
+
+	responses := shopresponse.ToShopCustomerResponse(shop)
+
+	return &responses, int(totalProducts), nil
 }

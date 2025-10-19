@@ -9,6 +9,7 @@ import (
 	"nusantara_service/internal/data/services"
 	dto "nusantara_service/internal/dto/request"
 	"nusantara_service/internal/response"
+	"nusantara_service/internal/utils"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -655,4 +656,45 @@ func (h *CustomerHandler) GetCustomerVouchersClaimed(c echo.Context) error {
 	}
 
 	return response.Success(c, http.StatusOK, "Customer claimed vouchers retrieved successfully", customerVouchers)
+}
+
+// GetShopByID handles the request to fetch shop details with paginated products.
+func (h *CustomerHandler) GetShopByID(c echo.Context) error {
+
+	pageInt, limitInt := utils.ParsePaginationParams(c, 10)
+	search := c.QueryParam("search")
+
+	shopId, err := uuid.Parse(c.Param("shop_id"))
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid shop ID format", err.Error())
+	}
+	typeIdStr := c.QueryParam("type_id")
+	var typeId uuid.UUID
+	if typeIdStr != "" {
+		parsedId, err := uuid.Parse(typeIdStr)
+		if err != nil {
+			return response.Error(c, http.StatusBadRequest, "invalid type ID format", err.Error())
+		}
+		typeId = parsedId
+	}
+
+	shop, totalProducts, err := h.CustomerService.GetDetailShopById(
+		c.Request().Context(),
+		pageInt,
+		limitInt,
+		search,
+		typeId,
+		shopId,
+	)
+
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, "failed to get shop details", err.Error())
+	}
+
+	meta := utils.BuildPaginationMeta(c, pageInt, limitInt, int(totalProducts))
+
+	return response.PaginatedSuccess(c, http.StatusOK, "Successfully retrieved shop details", shop, meta)
 }

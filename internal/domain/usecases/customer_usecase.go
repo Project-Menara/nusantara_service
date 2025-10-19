@@ -13,6 +13,7 @@ import (
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
 	dto "nusantara_service/internal/dto/request"
+	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
 	otp "nusantara_service/internal/utils/otp"
@@ -1272,4 +1273,34 @@ func (u *CustomerService) GetCustomerVouchersClaimed(ctx context.Context, custom
 	_ = configs.SetRedis(ctx, cacheKey, dataCache, time.Minute*30)
 
 	return userVouchers, nil
+}
+
+// GetDetailShopById implements services.CustomerService.
+func (u *CustomerService) GetDetailShopById(ctx context.Context, page, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error) {
+	offset := (page - 1) * limit
+	if offset < 0 {
+		offset = 0
+	}
+
+	cacheKey := fmt.Sprintf("shop_customer:%s:page:%d:limit:%d:search:%s:type:%s", shopID, page, limit, search, typeID)
+
+	if cached, err := configs.GetRedis(ctx, cacheKey); err == nil && len(cached) > 0 {
+		var shop shopresponse.ShopCustomerResponse
+		if json.Unmarshal([]byte(cached), &shop) == nil {
+			return &shop, 0, nil
+		}
+	}
+
+	shop, totalProducts, err := u.repo.FindShopById(ctx, offset, limit, search, typeID, shopID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, 0, response.NewCustomError(response.ErrNotFound, "shop not found", 404)
+		}
+		return nil, 0, err
+	}
+
+	buf, _ := json.Marshal(shop)
+	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*60)
+
+	return shop, totalProducts, nil
 }

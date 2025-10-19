@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"nusantara_service/internal/domain/entities"
 	dto "nusantara_service/internal/dto/request"
+	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"nusantara_service/internal/response"
 	"time"
 
@@ -39,4 +40,6 @@ type CustomerService interface {
 	GetCustomerPoint(ctx context.Context, customerID uuid.UUID) (*entities.UserPointEntity, int, *time.Time, error)
 	GetCustomerPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error)
 	GetCustomerVouchersClaimed(ctx context.Context, customerID uuid.UUID) ([]*entities.UserVoucherEntity, error)
+
+	GetDetailShopById(ctx context.Context, page, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error)
 }

@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"nusantara_service/internal/domain/entities"
+	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,4 +35,6 @@ type CustomerRepository interface {
 	DecreaseTotalPoints(ctx context.Context, customerID uuid.UUID, amount int) error
 	FindUserPointHistory(ctx context.Context, customerID uuid.UUID) ([]*entities.UserPointHistoriesEntity, error)
 	FindUserVoucherClaimed(ctx context.Context, userId uuid.UUID) ([]*entities.UserVoucherEntity, error)
+
+	FindShopById(ctx context.Context, offset int, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error)
 }

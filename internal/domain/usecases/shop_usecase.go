@@ -422,4 +422,8 @@ func (s *ShopService) invalidateShopCache(ctx context.Context) {
 	for iterID.Next(ctx) {
 		s.rdb.Del(ctx, iterID.Val())
 	}
+	iterIDCust := s.rdb.Scan(ctx, 0, "shop_customer:*", 0).Iterator()
+	for iterIDCust.Next(ctx) {
+		s.rdb.Del(ctx, iterIDCust.Val())
+	}
 }
