@@ -77,3 +77,81 @@ func ToShopNearbyResponse(shop entities.ShopEntity, distance float64) ShopNearby
 		Distance:     fmt.Sprintf("%.2f Km", distance),
 	}
 }
+
+type ShopNameCashierResponse struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+type ShopCashierResponse struct {
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Cover       string    `json:"cover"`
+	Description string    `json:"description"`
+	FullAddress string    `json:"full_address"`
+	Lat         float64   `json:"lat"`
+	Lng         float64   `json:"lang"`
+	Status      int       `json:"status"`
+	ShopImages  []string  `json:"shop_images"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"update_at"`
+}
+
+func ToShopCashierResponse(shop entities.ShopEntity) ShopCashierResponse {
+	shopImages := []string{}
+	for _, shopImage := range shop.ShopImages {
+		shopImages = append(shopImages, shopImage.Image.ImagePath)
+	}
+	return ShopCashierResponse{
+		ID:          shop.ID,
+		Name:        shop.Name,
+		Cover:       shop.Cover,
+		Description: shop.Description,
+		FullAddress: shop.FullAddress,
+		Lat:         shop.Lat,
+		Lng:         shop.Lng,
+		Status:      shop.Status,
+		ShopImages:  shopImages,
+		CreatedAt:   shop.CreatedAt,
+		UpdatedAt:   shop.UpdatedAt,
+	}
+}
+
+type ShopProductCashierResponse struct {
+	ID            uuid.UUID `json:"id"`
+	Name          string    `json:"name"`
+	Image         string    `json:"image"`
+	Code          string    `json:"code"`
+	Price         int       `json:"price"`
+	Unit          string    `json:"unit"`
+	Stock         int       `json:"stock"`
+	Description   string    `json:"description"`
+	Status        int       `json:"status"`
+	TypeProduct   string    `json:"type_product"`
+	ProductImages []string  `json:"product_images"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+func ToShopProductCashierResponse(shopProducts *entities.ShopProductEntity) ShopProductCashierResponse {
+	productImages := []string{}
+	for _, productImage := range shopProducts.Product.ProductImages {
+		productImages = append(productImages, productImage.Image.ImagePath)
+	}
+
+	return ShopProductCashierResponse{
+		ID:            shopProducts.ID,
+		Name:          shopProducts.Product.Name,
+		Image:         shopProducts.Product.Image.ImagePath,
+		Code:          shopProducts.Product.Code,
+		Price:         int(shopProducts.Price),
+		Unit:          shopProducts.Product.Unit,
+		Stock:         shopProducts.Stock,
+		Description:   shopProducts.Product.Description,
+		Status:        shopProducts.Status,
+		TypeProduct:   shopProducts.Product.TypeProduct.Name,
+		ProductImages: productImages,
+		CreatedAt:     shopProducts.CreatedAt,
+		UpdatedAt:     shopProducts.UpdatedAt,
+	}
+}

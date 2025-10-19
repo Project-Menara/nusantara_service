@@ -73,7 +73,7 @@ func (b *BannerHandler) GetAllBanner(c echo.Context) error {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
 		}
-		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to create banner")
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get banner")
 	}
 
 	meta := utils.BuildPaginationMeta(c, pageInt, limtiInt, total)

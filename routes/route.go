@@ -2,6 +2,7 @@ package routes
 
 import (
 	"nusantara_service/internal/data/dataSources/cloudinary"
+	cashierroute "nusantara_service/routes/CashierRoute"
 
 	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
@@ -21,4 +22,5 @@ func Routes(e *echo.Echo, db *gorm.DB, rdb *redis.Client, cloudinarySvc *cloudin
 	ShopRoutes(v1.Group("/shop"), db, rdb, cloudinarySvc)
 	CustomerAddressRoutes(v1.Group("/customer"), db, rdb)
 	EventRoutes(v1.Group("/event"), db, rdb, cloudinarySvc)
+	cashierroute.CashierRoute(v1.Group("/cashier"), db, rdb)
 }
