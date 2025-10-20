@@ -22,7 +22,7 @@ type UserEntity struct {
 	Status      int            `gorm:"type:int" json:"status"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
-	DeletedAt   gorm.DeletedAt `json:"deleted_at"`
+	DeletedAt   gorm.DeletedAt `json:"-"`
 }
 
 func (UserEntity) TableName() string {

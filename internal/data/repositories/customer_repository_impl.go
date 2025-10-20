@@ -4,6 +4,7 @@ import (
 	"context"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
+	cartresponse "nusantara_service/internal/dto/responses/cart_response"
 	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"time"
 
@@ -496,4 +497,27 @@ func (u *CustomerRepositoryImpl) FindShopById(ctx context.Context, offset int, l
 	responses := shopresponse.ToShopCustomerResponse(shop)
 
 	return &responses, int(totalProducts), nil
+}
+
+// GetMyCart implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error) {
+	var cart entities.CartEntity
+
+	err := u.db.WithContext(ctx).
+		Where("user_id = ? AND status = ?", customerID, 0).
+		Preload("CartItems.Product").
+		Preload("CartItems.Product.Image").
+		Preload("CartItems.Product.ProductImages.Image").
+		Preload("CartItems.Product.TypeProduct").
+		Preload("CartItems.Product.User").
+		Preload("CartItems.User").
+		First(&cart).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	cartResponse := cartresponse.ToCartResponse(cart)
+
+	return &cartResponse, nil
 }

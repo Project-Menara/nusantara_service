@@ -14,6 +14,20 @@ import (
 )
 
 func main() {
+	// @title API DOCS NUSANTARA OLEH OLEH
+	// @version 1.0
+	// @description This is a Nusantara Oleh Oleh Apps
+	// @termOfService http://swagger.io/terms/
+
+	// @contact.name API Support
+	// @contact.url http://www.swagger.io/support
+	// @contact.email support@swagger.io
+
+	// @license.name Apache 2.0
+	// @license.url http://www.apache.org/license/LICENSE-2.0.html
+
+	// @host https://nusantaraservice-production.up.railway.app
+	// @BasePath /api/v1
 	configs.LoadEnv()
 
 	db := configs.InitDB()

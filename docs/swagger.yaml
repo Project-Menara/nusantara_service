@@ -1,0 +1,109 @@
+basePath: /api/v1
+definitions:
+  dto.RegisterAdminRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      role_id:
+        type: string
+      username:
+        type: string
+    type: object
+  entities.RoleEntity:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  entities.UserEntity:
+    properties:
+      created_at:
+        type: string
+      date_of_birth:
+        type: string
+      email:
+        type: string
+      gender:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+      photo:
+        type: string
+      role:
+        $ref: '#/definitions/entities.RoleEntity'
+      status:
+        type: integer
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  response.Response:
+    properties:
+      data: {}
+      error: {}
+      message:
+        type: string
+      status_code:
+        type: integer
+    type: object
+host: https://nusantaraservice-production.up.railway.app
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: This is a Nusantara Oleh Oleh Apps
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/license/LICENSE-2.0.html
+  title: API DOCS NUSANTARA OLEH OLEH
+  version: "1.0"
+paths:
+  /admin/register:
+    post:
+      consumes:
+      - application/json
+      description: Mendaftarkan SuperAdmin baru ke sistem.
+      parameters:
+      - description: Data Registrasi Admin
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterAdminRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Admin Registered
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/entities.UserEntity'
+              type: object
+        "400":
+          description: 'Request tidak valid (contoh: field kosong)'
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Kesalahan internal server
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: API Register SuperAdmin
+      tags:
+      - SuperAdmin
+swagger: "2.0"

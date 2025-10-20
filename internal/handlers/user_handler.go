@@ -22,6 +22,16 @@ func NewAuthHandler(service services.UserService) *UserHandler {
 	return &UserHandler{UserService: service}
 }
 
+// @Tags SuperAdmin
+// @Summary API Register SuperAdmin
+// @Description Mendaftarkan SuperAdmin baru ke sistem.
+// @Accept json
+// @Produce json
+// @Param request body dto.RegisterAdminRequest true "Data Registrasi Admin"
+// @Success 201 {object} response.Response{data=entities.UserEntity} "Admin Registered"
+// @Failure 400 {object} response.Response "Request tidak valid (contoh: field kosong)"
+// @Failure 500 {object} response.Response "Kesalahan internal server"
+// @Router /admin/register [post]
 func (h *UserHandler) RegisterAdmin(c echo.Context) error {
 	var req dto.RegisterAdminRequest
 	if err := c.Bind(&req); err != nil {
@@ -202,5 +212,3 @@ func (h *UserHandler) ChangePasswordSuperAdmin(c echo.Context) error {
 
 	return response.Success(c, http.StatusOK, "change password success", userUpdate)
 }
-
-//CUSTOMER

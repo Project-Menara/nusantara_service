@@ -7,10 +7,15 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+
+	_ "nusantara_service/docs"
+
+	echoSwagger "github.com/swaggo/echo-swagger"
 )
 
 func Routes(e *echo.Echo, db *gorm.DB, rdb *redis.Client, cloudinarySvc *cloudinary.CloudinaryService) {
 	v1 := e.Group("/api/v1")
+	v1.GET("/swagger/*", echoSwagger.WrapHandler)
 	RoleRoutes(v1.Group("/role"), db, rdb)
 	UserRoutes(v1.Group("/user"), db, rdb)
 	CustomerRoutes(v1.Group("/customer"), db, rdb, cloudinarySvc)

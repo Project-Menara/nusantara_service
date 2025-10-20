@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"nusantara_service/internal/domain/entities"
+	cartresponse "nusantara_service/internal/dto/responses/cart_response"
 	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"time"
 
@@ -37,4 +38,5 @@ type CustomerRepository interface {
 	FindUserVoucherClaimed(ctx context.Context, userId uuid.UUID) ([]*entities.UserVoucherEntity, error)
 
 	FindShopById(ctx context.Context, offset int, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error)
+	GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error)
 }
