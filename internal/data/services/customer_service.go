@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"nusantara_service/internal/domain/entities"
 	dto "nusantara_service/internal/dto/request"
+	cartresponse "nusantara_service/internal/dto/responses/cart_response"
 	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"nusantara_service/internal/response"
 	"time"
@@ -42,4 +43,7 @@ type CustomerService interface {
 	GetCustomerVouchersClaimed(ctx context.Context, customerID uuid.UUID) ([]*entities.UserVoucherEntity, error)
 
 	GetDetailShopById(ctx context.Context, page, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error)
+	GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error)
+	AddProductToMyCart(ctx context.Context, customerID uuid.UUID, req dto.AddCartItemRequest) error
+	DeleteCartItem(ctx context.Context, customerID uuid.UUID, productID uuid.UUID) error
 }

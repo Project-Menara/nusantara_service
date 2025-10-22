@@ -39,4 +39,7 @@ type CustomerRepository interface {
 
 	FindShopById(ctx context.Context, offset int, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error)
 	GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error)
+	CreateMyCart(ctx context.Context, cart *entities.CartEntity) (*entities.CartEntity, error)
+	AddProductToCart(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error
+	DeleteCartItem(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error
 }

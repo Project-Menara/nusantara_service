@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"nusantara_service/configs"
 	"nusantara_service/internal/data/dataSources/cloudinary"
@@ -13,6 +14,7 @@ import (
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
 	dto "nusantara_service/internal/dto/request"
+	cartresponse "nusantara_service/internal/dto/responses/cart_response"
 	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
@@ -1303,4 +1305,108 @@ func (u *CustomerService) GetDetailShopById(ctx context.Context, page, limit int
 	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*60)
 
 	return shop, totalProducts, nil
+}
+
+// GetMyCart implements services.CustomerService.
+func (u *CustomerService) GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error) {
+	cacheKey := fmt.Sprintf("mycart:%s", customerID)
+	if cached, err := configs.GetRedis(ctx, cacheKey); err == nil && len(cached) > 0 {
+		var data *cartresponse.CartResponse
+		if json.Unmarshal([]byte(cached), &data) == nil {
+			return data, nil
+		}
+	}
+	cart, err := u.repo.GetMyCart(ctx, customerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newCart := &entities.CartEntity{
+				ID:     uuid.New(),
+				UserID: customerID,
+				Status: 0,
+			}
+			myCart, createErr := u.repo.CreateMyCart(ctx, newCart)
+			if createErr != nil {
+				return nil, response.NewCustomError(response.ErrInternal, "failed to create cart", 500)
+			}
+			myCart.CartItems = []entities.CartItemEntity{}
+			myCartResp := cartresponse.ToCartResponse(*myCart)
+			return &myCartResp, nil
+		}
+		return nil, response.NewCustomError(response.ErrInternal, "failed to get my cart due to unexpected error", 500)
+	}
+	if len(cart.CartItems) == 0 {
+		cart.CartItems = []cartresponse.CartItemResponse{}
+	}
+	buf, _ := json.Marshal(cart)
+	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*30)
+	return cart, nil
+}
+
+// AddProductToMyCart implements services.CustomerService.
+func (u *CustomerService) AddProductToMyCart(ctx context.Context, customerID uuid.UUID, req dto.AddCartItemRequest) error {
+	var carts *cartresponse.CartResponse
+
+	retrievedCart, err := u.repo.GetMyCart(ctx, customerID)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newCart := &entities.CartEntity{
+				ID:     uuid.New(),
+				UserID: customerID,
+				Status: 0,
+			}
+			myCart, createErr := u.repo.CreateMyCart(ctx, newCart)
+			if createErr != nil {
+				return response.NewCustomError(response.ErrInternal, "failed to create cart", 500)
+			}
+			myCart.CartItems = []entities.CartItemEntity{}
+			myCartResp := cartresponse.ToCartResponse(*myCart)
+			carts = &myCartResp
+		} else {
+			return response.NewCustomError(response.ErrInternal, "failed to get cart due to unexpected error", 500)
+		}
+	} else {
+		carts = retrievedCart
+		for _, item := range carts.CartItems {
+			if item.Product.ID == req.ProductID {
+				return response.NewCustomError(response.ErrBadRequest, "product already exists in cart item.", 400)
+			}
+		}
+	}
+
+	updateErr := u.repo.AddProductToCart(ctx, carts.ID, req.ProductID)
+	if updateErr != nil {
+		return response.NewCustomError(response.ErrBadRequest, "failed to add or update product in cart", 400)
+	}
+	u.invalidateCartCache(ctx, customerID)
+	return nil
+}
+
+func (u *CustomerService) invalidateCartCache(ctx context.Context, custID uuid.UUID) {
+	key := fmt.Sprintf("mycart:%s", custID.String())
+
+	cmd := u.rdb.Del(ctx, key)
+
+	if cmd.Err() != nil && cmd.Err() != redis.Nil {
+		log.Printf("Failed to delete cart cache for %s: %v", custID.String(), cmd.Err())
+	}
+}
+
+// DeleteCartItem implements services.CustomerService.
+func (u *CustomerService) DeleteCartItem(ctx context.Context, customerID uuid.UUID, productID uuid.UUID) error {
+	cart, err := u.repo.GetMyCart(ctx, customerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "cart not found", 404)
+		}
+		return response.NewCustomError(response.ErrInternal, "failed to get cart", 500)
+	}
+
+	err = u.repo.DeleteCartItem(ctx, cart.ID, productID)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to delete cart item", 500)
+	}
+
+	u.invalidateCartCache(ctx, customerID)
+	return nil
 }

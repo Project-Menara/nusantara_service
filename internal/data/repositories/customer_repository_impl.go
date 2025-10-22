@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"context"
+	"errors"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
 	cartresponse "nusantara_service/internal/dto/responses/cart_response"
@@ -510,7 +511,7 @@ func (u *CustomerRepositoryImpl) GetMyCart(ctx context.Context, customerID uuid.
 		Preload("CartItems.Product.ProductImages.Image").
 		Preload("CartItems.Product.TypeProduct").
 		Preload("CartItems.Product.User").
-		Preload("CartItems.User").
+		Preload("User").
 		First(&cart).Error
 
 	if err != nil {
@@ -520,4 +521,59 @@ func (u *CustomerRepositoryImpl) GetMyCart(ctx context.Context, customerID uuid.
 	cartResponse := cartresponse.ToCartResponse(cart)
 
 	return &cartResponse, nil
+}
+
+// CreateMyCart implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) CreateMyCart(ctx context.Context, cart *entities.CartEntity) (*entities.CartEntity, error) {
+	if err := u.db.WithContext(ctx).Create(cart).Error; err != nil {
+		return nil, err
+	}
+	return cart, nil
+}
+
+// AddProductToCart implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) AddProductToCart(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error {
+	var cartItem entities.CartItemEntity
+
+	res := u.db.WithContext(ctx).
+		Where("cart_id = ? AND product_id = ?", cartID, productID).
+		First(&cartItem)
+
+	if res.Error != nil && !errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return res.Error
+	}
+
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		cartItem = entities.CartItemEntity{
+			ID:        uuid.New(),
+			CartID:    cartID,
+			ProductID: productID,
+			Selected:  false,
+		}
+		return u.db.WithContext(ctx).Create(&cartItem).Error
+	}
+
+	tx := u.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	return tx.Commit().Error
+}
+
+// DeleteCartItem implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) DeleteCartItem(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error {
+	res := u.db.WithContext(ctx).
+		Where("cart_id = ? AND product_id = ?", cartID, productID).
+		Delete(&entities.CartItemEntity{})
+
+	if res.Error != nil {
+		return res.Error
+	}
+
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
 }

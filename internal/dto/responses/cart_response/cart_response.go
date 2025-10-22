@@ -10,13 +10,13 @@ import (
 )
 
 type CartResponse struct {
-	ID             uuid.UUID          `json:"id"`
-	User           string             `json:"user"`
-	Status         int                `json:"status"`
-	CartItemEntity []CartItemResponse `json:"cart_items"`
-	CreatedAt      time.Time          `json:"created_at"`
-	UpdatedAt      time.Time          `json:"updated_at"`
-	DeletedAt      gorm.DeletedAt     `json:"deleted_at"`
+	ID        uuid.UUID          `json:"id"`
+	User      string             `json:"user"`
+	Status    int                `json:"status"`
+	CartItems []CartItemResponse `json:"cart_items"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
+	DeletedAt gorm.DeletedAt     `json:"deleted_at"`
 }
 
 type CartItemResponse struct {
@@ -48,12 +48,12 @@ func ToCartResponse(cart entities.CartEntity) CartResponse {
 		cartItems = append(cartItems, cartItemRes)
 	}
 	return CartResponse{
-		ID:             cart.ID,
-		User:           cart.User.Name,
-		Status:         cart.Status,
-		CartItemEntity: cartItems,
-		CreatedAt:      cart.CreatedAt,
-		UpdatedAt:      cart.UpdatedAt,
-		DeletedAt:      cart.DeletedAt,
+		ID:        cart.ID,
+		User:      cart.User.Name,
+		Status:    cart.Status,
+		CartItems: cartItems,
+		CreatedAt: cart.CreatedAt,
+		UpdatedAt: cart.UpdatedAt,
+		DeletedAt: cart.DeletedAt,
 	}
 }
