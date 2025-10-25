@@ -31,5 +31,7 @@ func RunMigrations(db *gorm.DB) error {
 		&model.EventBundleReward{},
 		&model.Cart{},
 		&model.CartItem{},
+		&model.Favorite{},
+		&model.FavoriteItem{},
 	)
 }

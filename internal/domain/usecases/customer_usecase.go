@@ -15,6 +15,7 @@ import (
 	"nusantara_service/internal/domain/repositories"
 	dto "nusantara_service/internal/dto/request"
 	cartresponse "nusantara_service/internal/dto/responses/cart_response"
+	favoriteresponse "nusantara_service/internal/dto/responses/favorite_response"
 	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"nusantara_service/internal/response"
 	"nusantara_service/internal/utils"
@@ -1369,7 +1370,7 @@ func (u *CustomerService) AddProductToMyCart(ctx context.Context, customerID uui
 		carts = retrievedCart
 		for _, item := range carts.CartItems {
 			if item.Product.ID == req.ProductID {
-				return response.NewCustomError(response.ErrBadRequest, "product already exists in cart item.", 400)
+				return response.NewCustomError(response.ErrExists, "product already exists in cart item.", 409)
 			}
 		}
 	}
@@ -1408,5 +1409,113 @@ func (u *CustomerService) DeleteCartItem(ctx context.Context, customerID uuid.UU
 	}
 
 	u.invalidateCartCache(ctx, customerID)
+	return nil
+}
+
+// GetMyFavorite implements services.CustomerService.
+func (u *CustomerService) GetMyFavorite(ctx context.Context, customerID uuid.UUID) (*favoriteresponse.FavoriteResponse, error) {
+	cacheKey := fmt.Sprintf("myfavorite:%s", customerID)
+	if cached, err := configs.GetRedis(ctx, cacheKey); err == nil && len(cached) > 0 {
+		var data *favoriteresponse.FavoriteResponse
+		if json.Unmarshal([]byte(cached), &data) == nil {
+			return data, nil
+		}
+	}
+
+	favorite, err := u.repo.GetMyFavorite(ctx, customerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newFavorite := &entities.FavoriteEntity{
+				ID:     uuid.New(),
+				UserID: customerID,
+			}
+
+			myFavorite, createErr := u.repo.CreateMyFavorite(ctx, newFavorite)
+			if createErr != nil {
+				return nil, response.NewCustomError(response.ErrInternal, "failed to create favorite", 500)
+			}
+			myFavorite.FavoriteItems = []entities.FavoriteItemEntity{}
+			myFavoriteRes := favoriteresponse.ToFavoriteResponse(*myFavorite)
+			return &myFavoriteRes, nil
+		}
+		return nil, response.NewCustomError(response.ErrInternal, "failed to get my favorite", 500)
+	}
+
+	if len(favorite.FavoriteItems) == 0 {
+		favorite.FavoriteItems = []favoriteresponse.FavoriteItemResponse{}
+	}
+	buf, _ := json.Marshal(favorite)
+	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*30)
+	return favorite, nil
+}
+
+// AddProductToFavorite implements services.CustomerService.
+func (u *CustomerService) AddProductToFavorite(ctx context.Context, customerID uuid.UUID, req dto.AddFavoriteItemRequest) error {
+	var favorites *favoriteresponse.FavoriteResponse
+
+	retrivedFavorite, err := u.repo.GetMyFavorite(ctx, customerID)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newFavorite := &entities.FavoriteEntity{
+				ID:     uuid.New(),
+				UserID: customerID,
+			}
+
+			myFavorite, createErr := u.repo.CreateMyFavorite(ctx, newFavorite)
+			if createErr != nil {
+				return response.NewCustomError(response.ErrInternal, "failed to create favorite", 500)
+			}
+			myFavorite.FavoriteItems = []entities.FavoriteItemEntity{}
+			myFavoriteRes := favoriteresponse.ToFavoriteResponse(*myFavorite)
+			favorites = &myFavoriteRes
+		} else {
+			return response.NewCustomError(response.ErrInternal, "failed to get my favorite", 500)
+		}
+	} else {
+		favorites = retrivedFavorite
+		for _, item := range favorites.FavoriteItems {
+			if item.Product.ID == req.ProductID {
+				return response.NewCustomError(response.ErrExists, "product already exists", 409)
+			}
+		}
+	}
+
+	updateErr := u.repo.AddProductToFavorite(ctx, favorites.ID, req.ProductID)
+	if updateErr != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to add or update in favorite", 400)
+	}
+
+	u.invalidateFavoriteCache(ctx, customerID)
+
+	return nil
+}
+
+func (u *CustomerService) invalidateFavoriteCache(ctx context.Context, custID uuid.UUID) {
+	key := fmt.Sprintf("myfavorite:%s", custID.String())
+
+	cmd := u.rdb.Del(ctx, key)
+
+	if cmd.Err() != nil && cmd.Err() != redis.Nil {
+		log.Printf("Failed to delete cart cache for %s: %v", custID.String(), cmd.Err())
+	}
+}
+
+// DeleteFavoriteItem implements services.CustomerService.
+func (u *CustomerService) DeleteFavoriteItem(ctx context.Context, customerID uuid.UUID, productID uuid.UUID) error {
+	favorite, err := u.repo.GetMyFavorite(ctx, customerID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.NewCustomError(response.ErrNotFound, "favorite not found", 404)
+		}
+		return response.NewCustomError(response.ErrInternal, "failed to get favorite", 500)
+	}
+
+	err = u.repo.DeleteFavoriteItem(ctx, favorite.ID, productID)
+	if err != nil {
+		return response.NewCustomError(response.ErrInternal, "failed to delete favorite", 500)
+	}
+
+	u.invalidateFavoriteCache(ctx, customerID)
 	return nil
 }

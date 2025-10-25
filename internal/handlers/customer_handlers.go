@@ -721,7 +721,7 @@ func (h *CustomerHandler) GetMyCart(c echo.Context) error {
 		return response.Error(c, http.StatusInternalServerError, "failed to get my cart", err.Error())
 	}
 	if len(myCart.CartItems) == 0 {
-		return response.Success(c, http.StatusOK, "Product not found", myCart)
+		return response.Success(c, http.StatusOK, "Product is Empty", myCart)
 	}
 
 	return response.Success(c, 200, "Get My Cart Success", myCart)
@@ -785,4 +785,93 @@ func (h *CustomerHandler) DeleteMyCartItem(c echo.Context) error {
 	}
 
 	return response.Success(c, http.StatusOK, "Deleted Cart Item Success", nil)
+}
+
+func (h *CustomerHandler) GetMyFavorite(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	myFavorite, err := h.CustomerService.GetMyFavorite(c.Request().Context(), uuid.MustParse(custID))
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, "failed to get my favorite", err.Error())
+	}
+
+	if len(myFavorite.FavoriteItems) == 0 {
+		return response.Success(c, http.StatusOK, "Prodcut is Empty", myFavorite)
+	}
+
+	return response.Success(c, http.StatusOK, "Get My Favorite Success", myFavorite)
+}
+
+func (h *CustomerHandler) AddProductToMyFavorite(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	var req dto.AddFavoriteItemRequest
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, err.Error(), "request invalid")
+	}
+
+	err := h.CustomerService.AddProductToFavorite(c.Request().Context(), uuid.MustParse(custID), req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, "failed add product to my favorite", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Add Product To My Favorite Success", nil)
+}
+
+func (h *CustomerHandler) DeleteMyFavoriteItem(c echo.Context) error {
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	productID, err := uuid.Parse(c.Param("product_id"))
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
+	}
+
+	err = h.CustomerService.DeleteFavoriteItem(c.Request().Context(), uuid.MustParse(custID), productID)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, "failed delete favorite item", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "Deleted Favorite Item Success", nil)
 }

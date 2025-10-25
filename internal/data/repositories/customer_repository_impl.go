@@ -6,6 +6,7 @@ import (
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
 	cartresponse "nusantara_service/internal/dto/responses/cart_response"
+	favoriteresponse "nusantara_service/internal/dto/responses/favorite_response"
 	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"time"
 
@@ -567,6 +568,81 @@ func (u *CustomerRepositoryImpl) DeleteCartItem(ctx context.Context, cartID uuid
 		Where("cart_id = ? AND product_id = ?", cartID, productID).
 		Delete(&entities.CartItemEntity{})
 
+	if res.Error != nil {
+		return res.Error
+	}
+
+	if res.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
+
+// GetMyFavorite implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) GetMyFavorite(ctx context.Context, customerID uuid.UUID) (*favoriteresponse.FavoriteResponse, error) {
+	var favorite entities.FavoriteEntity
+
+	err := u.db.WithContext(ctx).
+		Where("user_id = ?", customerID).
+		Preload("FavoriteItems.Product").
+		Preload("FavoriteItems.Product.Image").
+		Preload("FavoriteItems.Product.ProductImages.Image").
+		Preload("FavoriteItems.Product.TypeProduct").
+		Preload("FavoriteItems.Product.User").
+		Preload("User").
+		First(&favorite).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	favoriteResponse := favoriteresponse.ToFavoriteResponse(favorite)
+	return &favoriteResponse, nil
+}
+
+// CreateMyFavorite implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) CreateMyFavorite(ctx context.Context, favorite *entities.FavoriteEntity) (*entities.FavoriteEntity, error) {
+	if err := u.db.WithContext(ctx).Create(favorite).Error; err != nil {
+		return nil, err
+	}
+	return favorite, nil
+}
+
+// AddProductToFavorite implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) AddProductToFavorite(ctx context.Context, favoriteID uuid.UUID, productID uuid.UUID) error {
+	var favoriteItem entities.FavoriteItemEntity
+
+	res := u.db.WithContext(ctx).
+		Where("favorite_id = ? AND product_id = ?", favoriteID, productID).
+		First(&favoriteItem)
+	if res.Error != nil && !errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		return res.Error
+	}
+
+	if errors.Is(res.Error, gorm.ErrRecordNotFound) {
+		favoriteItem = entities.FavoriteItemEntity{
+			ID:         uuid.New(),
+			FavoriteID: favoriteID,
+			ProductID:  productID,
+			Selected:   true,
+		}
+		return u.db.WithContext(ctx).Create(&favoriteItem).Error
+	}
+
+	tx := u.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	return tx.Commit().Error
+}
+
+// DeleteFavoriteItem implements repositories.CustomerRepository.
+func (u *CustomerRepositoryImpl) DeleteFavoriteItem(ctx context.Context, favoriteID uuid.UUID, productID uuid.UUID) error {
+	res := u.db.WithContext(ctx).
+		Where("favorite_id = ? AND product_id = ?", favoriteID, productID).
+		Delete(&entities.FavoriteItemEntity{})
 	if res.Error != nil {
 		return res.Error
 	}

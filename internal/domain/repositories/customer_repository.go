@@ -4,6 +4,7 @@ import (
 	"context"
 	"nusantara_service/internal/domain/entities"
 	cartresponse "nusantara_service/internal/dto/responses/cart_response"
+	favoriteresponse "nusantara_service/internal/dto/responses/favorite_response"
 	shopresponse "nusantara_service/internal/dto/responses/shop_response"
 	"time"
 
@@ -38,8 +39,14 @@ type CustomerRepository interface {
 	FindUserVoucherClaimed(ctx context.Context, userId uuid.UUID) ([]*entities.UserVoucherEntity, error)
 
 	FindShopById(ctx context.Context, offset int, limit int, search string, typeID uuid.UUID, shopID uuid.UUID) (*shopresponse.ShopCustomerResponse, int, error)
+
 	GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error)
 	CreateMyCart(ctx context.Context, cart *entities.CartEntity) (*entities.CartEntity, error)
 	AddProductToCart(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error
 	DeleteCartItem(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error
+
+	GetMyFavorite(ctx context.Context, customerID uuid.UUID) (*favoriteresponse.FavoriteResponse, error)
+	CreateMyFavorite(ctx context.Context, favorite *entities.FavoriteEntity) (*entities.FavoriteEntity, error)
+	AddProductToFavorite(ctx context.Context, favoriteID uuid.UUID, productID uuid.UUID) error
+	DeleteFavoriteItem(ctx context.Context, favoriteID uuid.UUID, productID uuid.UUID) error
 }
