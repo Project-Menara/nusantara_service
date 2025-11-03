@@ -39,7 +39,7 @@ func (c *CashierRepositoryImpl) FindByAll(ctx context.Context, offset int, limit
 		return nil, 0, err
 	}
 
-	if err := query.Order("users.created_at DESC").Limit(limit).Offset(offset).Find(&cashier).Error; err != nil {
+	if err := query.Order("users.created_at DESC").Limit(limit).Offset(offset).Preload("Role").Find(&cashier).Error; err != nil {
 		return nil, 0, err
 	}
 

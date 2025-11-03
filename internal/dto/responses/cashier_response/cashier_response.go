@@ -21,12 +21,16 @@ type CashierResponse struct {
 }
 
 func ToCashierResponse(user entities.UserEntity) CashierResponse {
+	var photo string
+	if user.Photo != nil {
+		photo = *user.Photo
+	}
 	return CashierResponse{
 		ID:        uuid.MustParse(user.ID),
 		Name:      user.Name,
 		Username:  user.Username,
 		Email:     user.Email,
-		Photo:     *user.Photo,
+		Photo:     photo,
 		Status:    user.Status,
 		Role:      user.Role.Name,
 		CreatedAt: user.CreatedAt,
