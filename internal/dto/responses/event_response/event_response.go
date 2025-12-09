@@ -77,3 +77,17 @@ func ToEventResponse(event entities.EventEntity) EventResponse {
 		return EventResponse{}
 	}
 }
+
+type EventPublicResponse struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Cover string    `json:"cover"`
+}
+
+func ToEventPublicResponse(event entities.EventEntity) EventPublicResponse {
+	return EventPublicResponse{
+		ID:    event.ID,
+		Name:  event.Name,
+		Cover: event.Cover,
+	}
+}

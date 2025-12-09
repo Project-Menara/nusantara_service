@@ -24,4 +24,6 @@ type EventRepository interface {
 	DeleteEventProductsByEventID(ctx context.Context, eventID uuid.UUID) error
 	DeleteEventBundleBuysByEventID(ctx context.Context, eventID uuid.UUID) error
 	DeleteEventBundleRewardsByEventID(ctx context.Context, eventID uuid.UUID) error
+
+	FindAllPublic(ctx context.Context) ([]*entities.EventEntity, error)
 }

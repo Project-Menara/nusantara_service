@@ -252,3 +252,20 @@ func (e *EventHandler) UpdateStatusEvent(c echo.Context) error {
 
 	return response.Success(c, http.StatusOK, "update status success", nil)
 }
+
+func (e *EventHandler) GetAllEventPublic(c echo.Context) error {
+	events, err := e.service.GetAllEventPublic(c.Request().Context())
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, err.Error(), "failed to get events")
+	}
+
+	data := make([]eventresponse.EventPublicResponse, len(events))
+	for i, e := range events {
+		data[i] = eventresponse.ToEventPublicResponse(*e)
+	}
+
+	return response.Success(c, http.StatusOK, "Events Retrieved Succfully", data)
+}

@@ -424,3 +424,29 @@ func (e *EventService) UpdateStatusEvent(ctx context.Context, id uuid.UUID, req 
 	e.invalidateEventCache(ctx)
 	return nil
 }
+
+// GetAllEventPublic implements services.EventService.
+func (e *EventService) GetAllEventPublic(ctx context.Context) ([]*entities.EventEntity, error) {
+	cacheKey := fmt.Sprintln("events:public")
+	if cached, err := configs.GetRedis(ctx, cacheKey); err == nil && len(cached) > 0 {
+		var data []*entities.EventEntity
+		if json.Unmarshal([]byte(cached), &data) == nil {
+			return data, nil
+		}
+	}
+
+	events, err := e.eventRepo.FindAllPublic(ctx)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, response.NewCustomError(response.ErrNotFound, "events not found", 404)
+		}
+		return nil, response.NewCustomError(response.ErrInternal, "failed to fetch events", 500)
+	}
+
+	buf, _ := json.Marshal(map[string]any{
+		"data": events,
+	})
+
+	_ = configs.SetRedis(ctx, cacheKey, buf, time.Minute*30)
+	return events, nil
+}

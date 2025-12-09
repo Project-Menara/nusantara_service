@@ -186,3 +186,13 @@ func (e *EventRepositoryImpl) DeleteEventBundleRewardsByEventID(ctx context.Cont
 func (e *EventRepositoryImpl) DeleteEventProductsByEventID(ctx context.Context, eventID uuid.UUID) error {
 	return e.db.WithContext(ctx).Where("event_id = ?", eventID).Delete(&entities.EventProductEntity{}).Error
 }
+
+// FindAllPublic implements repositories.EventRepository.
+func (e *EventRepositoryImpl) FindAllPublic(ctx context.Context) ([]*entities.EventEntity, error) {
+	var events []*entities.EventEntity
+	if err := e.preloadRelations(e.db.WithContext(ctx)).Find(&events).Error; err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}

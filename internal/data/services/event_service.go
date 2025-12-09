@@ -15,4 +15,6 @@ type EventService interface {
 	UpdateEvent(ctx context.Context, superAdminId uuid.UUID, id uuid.UUID, req dto.UpdateEventRequest) error
 	DeleteEvent(ctx context.Context, id uuid.UUID) error
 	UpdateStatusEvent(ctx context.Context, id uuid.UUID, req dto.UpdateStatusEventRequest) error
+
+	GetAllEventPublic(ctx context.Context) ([]*entities.EventEntity, error)
 }
