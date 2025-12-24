@@ -32,13 +32,14 @@ import (
 type CustomerService struct {
 	repo          repositories.CustomerRepository
 	voucherRepo   repositories.VoucherRepository
+	shopRepo      repositories.ShopRepository
 	rdb           *redis.Client
 	cloudinarySvc cloudinary.CloudinaryService
 	db            *gorm.DB
 }
 
-func NewCustomerUsecase(repo repositories.CustomerRepository, rdb *redis.Client, cloudinarySvc *cloudinary.CloudinaryService, db *gorm.DB, voucherRepo repositories.VoucherRepository) services.CustomerService {
-	return &CustomerService{repo: repo, rdb: rdb, cloudinarySvc: *cloudinarySvc, db: db, voucherRepo: voucherRepo}
+func NewCustomerUsecase(repo repositories.CustomerRepository, rdb *redis.Client, cloudinarySvc *cloudinary.CloudinaryService, db *gorm.DB, voucherRepo repositories.VoucherRepository, shopRepo repositories.ShopRepository) services.CustomerService {
+	return &CustomerService{repo: repo, rdb: rdb, cloudinarySvc: *cloudinarySvc, db: db, voucherRepo: voucherRepo, shopRepo: shopRepo}
 }
 
 func (u *CustomerService) CheckPhone(ctx context.Context, req dto.CheckPhoneRequest) (*response.CheckPhoneResult, error) {
@@ -1344,8 +1345,30 @@ func (u *CustomerService) GetMyCart(ctx context.Context, customerID uuid.UUID) (
 }
 
 // AddProductToMyCart implements services.CustomerService.
-func (u *CustomerService) AddProductToMyCart(ctx context.Context, customerID uuid.UUID, req dto.AddCartItemRequest) error {
+func (u *CustomerService) AddProductToMyCart(ctx context.Context, customerID uuid.UUID, shopId uuid.UUID, req dto.AddCartItemRequest) error {
 	var carts *cartresponse.CartResponse
+	shop, err := u.shopRepo.FindById(ctx, shopId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Status code untuk Not Found biasanya 404, bukan 500
+			return response.NewCustomError(response.ErrNotFound, "shop not found", 404)
+		}
+		return response.NewCustomError(response.ErrInternal, "failed to get shop", 500)
+	}
+
+	// Gunakan flag untuk mengecek keberadaan produk
+	isProductAvailable := false
+	for _, sp := range shop.ShopProducts {
+		if req.ProductID == sp.ProductID {
+			isProductAvailable = true
+			break // Produk ditemukan, hentikan perulangan
+		}
+	}
+
+	// Jika setelah dicek semua tetap tidak ketemu, baru return error
+	if !isProductAvailable {
+		return response.NewCustomError(response.ErrBadRequest, "Product not available in store", 400)
+	}
 
 	retrievedCart, err := u.repo.GetMyCart(ctx, customerID)
 
@@ -1355,6 +1378,7 @@ func (u *CustomerService) AddProductToMyCart(ctx context.Context, customerID uui
 				ID:     uuid.New(),
 				UserID: customerID,
 				Status: 0,
+				ShopID: shop.ID,
 			}
 			myCart, createErr := u.repo.CreateMyCart(ctx, newCart)
 			if createErr != nil {

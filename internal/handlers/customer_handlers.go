@@ -741,12 +741,17 @@ func (h *CustomerHandler) AddProductToMyCart(c echo.Context) error {
 	claims := user.Claims.(jwt.MapClaims)
 	custID := claims["user_id"].(string)
 
+	shopId, err := uuid.Parse(c.Param("shopId"))
+	if err != nil {
+		return response.Error(c, 400, "Bad request", err.Error())
+	}
+
 	var req dto.AddCartItemRequest
 	if err := c.Bind(&req); err != nil {
 		return response.Error(c, http.StatusBadRequest, err.Error(), "request invalid")
 	}
 
-	err := h.CustomerService.AddProductToMyCart(c.Request().Context(), uuid.MustParse(custID), req)
+	err = h.CustomerService.AddProductToMyCart(c.Request().Context(), uuid.MustParse(custID), shopId, req)
 	if err != nil {
 		if customErr, ok := response.AsCustomErr(err); ok {
 			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())

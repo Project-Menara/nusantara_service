@@ -12,6 +12,7 @@ import (
 type CartResponse struct {
 	ID        uuid.UUID          `json:"id"`
 	User      string             `json:"user"`
+	Shop      string             `json:"shop"`
 	Status    int                `json:"status"`
 	CartItems []CartItemResponse `json:"cart_items"`
 	CreatedAt time.Time          `json:"created_at"`
@@ -50,6 +51,7 @@ func ToCartResponse(cart entities.CartEntity) CartResponse {
 	return CartResponse{
 		ID:        cart.ID,
 		User:      cart.User.Name,
+		Shop:      cart.Shop.Name,
 		Status:    cart.Status,
 		CartItems: cartItems,
 		CreatedAt: cart.CreatedAt,

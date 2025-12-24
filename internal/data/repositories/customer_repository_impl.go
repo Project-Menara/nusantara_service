@@ -513,6 +513,7 @@ func (u *CustomerRepositoryImpl) GetMyCart(ctx context.Context, customerID uuid.
 		Preload("CartItems.Product.TypeProduct").
 		Preload("CartItems.Product.User").
 		Preload("User").
+		Preload("Shop").
 		First(&cart).Error
 
 	if err != nil {
