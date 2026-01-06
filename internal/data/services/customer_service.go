@@ -47,6 +47,7 @@ type CustomerService interface {
 
 	GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error)
 	AddProductToMyCart(ctx context.Context, customerID uuid.UUID, shopId uuid.UUID, req dto.AddCartItemRequest) error
+	UpdateSelectedCartItem(ctx context.Context, customerID uuid.UUID, cartID uuid.UUID, req dto.UpdateSelectedCartItem) error
 	DeleteCartItem(ctx context.Context, customerID uuid.UUID, productID uuid.UUID) error
 
 	GetMyFavorite(ctx context.Context, customerID uuid.UUID) (*favoriteresponse.FavoriteResponse, error)

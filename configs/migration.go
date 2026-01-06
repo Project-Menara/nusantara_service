@@ -33,5 +33,10 @@ func RunMigrations(db *gorm.DB) error {
 		&model.CartItem{},
 		&model.Favorite{},
 		&model.FavoriteItem{},
+		&model.Order{},
+		&model.OrderItem{},
+		&model.OrderEvent{},
+		&model.OrderReward{},
+		&model.OrderVoucher{},
 	)
 }

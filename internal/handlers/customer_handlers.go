@@ -762,6 +762,41 @@ func (h *CustomerHandler) AddProductToMyCart(c echo.Context) error {
 	return response.Success(c, http.StatusOK, "Add Product To cart success", nil)
 }
 
+func (h *CustomerHandler) UpdateSelectedCartItem(c echo.Context) error {
+	var req dto.UpdateSelectedCartItem
+	if err := c.Bind(&req); err != nil {
+		return response.Error(c, http.StatusBadRequest, "bad request", err.Error())
+	}
+
+	cartId, err := uuid.Parse(c.Param("cartId"))
+	if err != nil {
+		return response.Error(c, http.StatusBadRequest, "invalid uuid", err.Error())
+	}
+
+	userToken := c.Get("user")
+	if userToken == nil {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	user, ok := userToken.(*jwt.Token)
+	if !ok {
+		return response.Error(c, http.StatusUnauthorized, "Unauthorized: token invalid or expired", nil)
+	}
+
+	claims := user.Claims.(jwt.MapClaims)
+	custID := claims["user_id"].(string)
+
+	err = h.CustomerService.UpdateSelectedCartItem(c.Request().Context(), uuid.MustParse(custID), cartId, req)
+	if err != nil {
+		if customErr, ok := response.AsCustomErr(err); ok {
+			return response.Error(c, customErr.Status, customErr.Msg, customErr.Err.Error())
+		}
+		return response.Error(c, http.StatusInternalServerError, "failed to update selected product", err.Error())
+	}
+
+	return response.Success(c, http.StatusOK, "updated successfully", nil)
+}
+
 func (h *CustomerHandler) DeleteMyCartItem(c echo.Context) error {
 	userToken := c.Get("user")
 	if userToken == nil {

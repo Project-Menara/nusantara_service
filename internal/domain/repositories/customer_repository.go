@@ -43,8 +43,8 @@ type CustomerRepository interface {
 	GetMyCart(ctx context.Context, customerID uuid.UUID) (*cartresponse.CartResponse, error)
 	CreateMyCart(ctx context.Context, cart *entities.CartEntity) (*entities.CartEntity, error)
 	AddProductToCart(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error
+	UpdateSelectedCartItem(ctx context.Context, cartID uuid.UUID, productID uuid.UUID, selected bool) error
 	DeleteCartItem(ctx context.Context, cartID uuid.UUID, productID uuid.UUID) error
-
 	GetMyFavorite(ctx context.Context, customerID uuid.UUID) (*favoriteresponse.FavoriteResponse, error)
 	CreateMyFavorite(ctx context.Context, favorite *entities.FavoriteEntity) (*entities.FavoriteEntity, error)
 	AddProductToFavorite(ctx context.Context, favoriteID uuid.UUID, productID uuid.UUID) error

@@ -47,6 +47,7 @@ func CustomerRoutes(e *echo.Group, db *gorm.DB, rdb *redis.Client, cloudinarySvc
 	e.GET("/shop-detail/:shop_id", custHandler.GetShopByID)
 	e.GET("/my-cart", custHandler.GetMyCart, middlewares.JWTMiddleware(rdb))
 	e.POST("/add-cart-item/:shopId", custHandler.AddProductToMyCart, middlewares.JWTMiddleware(rdb))
+	e.PUT("/update-selected-product/:cartId", custHandler.UpdateSelectedCartItem, middlewares.JWTMiddleware(rdb))
 	e.DELETE("/delete-cart-item/:product_id", custHandler.DeleteMyCartItem, middlewares.JWTMiddleware(rdb))
 
 	e.GET("/my-favorite", custHandler.GetMyFavorite, middlewares.JWTMiddleware(rdb))

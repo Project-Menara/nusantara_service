@@ -1543,3 +1543,22 @@ func (u *CustomerService) DeleteFavoriteItem(ctx context.Context, customerID uui
 	u.invalidateFavoriteCache(ctx, customerID)
 	return nil
 }
+
+// UpdateSelectedCartItem implements [services.CustomerService].
+func (u *CustomerService) UpdateSelectedCartItem(ctx context.Context, customerID uuid.UUID, cartID uuid.UUID, req dto.UpdateSelectedCartItem) error {
+	err := u.repo.UpdateSelectedCartItem(ctx, cartID, req.ProductID, req.Selected)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			msg := "cart not found"
+			if req.ProductID != uuid.Nil {
+				msg = "product not found in this cart"
+			}
+			return response.NewCustomError(response.ErrNotFound, msg, 404)
+		}
+
+		return response.NewCustomError(response.ErrInternal, "failed to update item", 500)
+	}
+	u.invalidateCartCache(ctx, customerID)
+	return nil
+}

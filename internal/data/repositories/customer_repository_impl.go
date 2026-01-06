@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"errors"
+	"nusantara_service/internal/data/model"
 	"nusantara_service/internal/domain/entities"
 	"nusantara_service/internal/domain/repositories"
 	cartresponse "nusantara_service/internal/dto/responses/cart_response"
@@ -561,6 +562,29 @@ func (u *CustomerRepositoryImpl) AddProductToCart(ctx context.Context, cartID uu
 	}
 
 	return tx.Commit().Error
+}
+
+// UpdateSelectedCartItem implements [repositories.CustomerRepository].
+func (u *CustomerRepositoryImpl) UpdateSelectedCartItem(ctx context.Context, cartID uuid.UUID, productID uuid.UUID, selected bool) error {
+	query := u.db.WithContext(ctx).Model(&model.CartItem{}).Where("cart_id = ?", cartID)
+
+	// Jika ingin update spesifik produk
+	if productID != uuid.Nil {
+		query = query.Where("product_id = ?", productID)
+	}
+
+	result := query.Update("selected", selected)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	// Jika tidak ada baris yang ter-update, artinya ID tidak ditemukan
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
 }
 
 // DeleteCartItem implements repositories.CustomerRepository.
