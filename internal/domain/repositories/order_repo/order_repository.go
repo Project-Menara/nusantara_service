@@ -18,4 +18,6 @@ type OrderRepository interface {
 
 	GetCartUser(ctx context.Context, userId uuid.UUID) (*model.Cart, error)
 	GetDetailCartUser(ctx context.Context, cartId uuid.UUID) ([]*model.CartItem, error)
+	// DeleteCartItemsByIDs deletes cart items by their IDs.
+	DeleteCartItemsByIDs(ctx context.Context, ids []uuid.UUID) error
 }

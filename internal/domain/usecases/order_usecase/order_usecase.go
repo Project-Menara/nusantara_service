@@ -3,6 +3,8 @@ package orderusecase
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"nusantara_service/internal/data/model"
 	orderrepoimpl "nusantara_service/internal/data/repositories/order_repo_impl"
 	orderservice "nusantara_service/internal/data/services/order_service"
@@ -30,6 +32,16 @@ func NewOrderUsecase(orderRepo orderrepo.OrderRepository, userRepo repositories.
 func generateCodeOrder() string {
 	id := strings.ToUpper(uuid.New().String())
 	return "ORD-" + id[:8]
+}
+
+func (u *OrderUsecase) invalidateCartCache(ctx context.Context, custID uuid.UUID) {
+	key := fmt.Sprintf("mycart:%s", custID.String())
+
+	cmd := u.rdb.Del(ctx, key)
+
+	if cmd.Err() != nil && cmd.Err() != redis.Nil {
+		log.Printf("Failed to delete cart cache for %s: %v", custID.String(), cmd.Err())
+	}
 }
 
 // CreateOrder implements [orderservice.OrderService].
@@ -124,6 +136,22 @@ func (o *OrderUsecase) CreateOrder(ctx context.Context, customerID uuid.UUID) er
 		}).Error; err != nil {
 			return response.NewCustomError(response.ErrInternal, "failed to update order total", 500)
 		}
+
+		// Hapus cart items yang sudah dipindahkan ke order (hanya yang dipilih)
+		var selectedIDs []uuid.UUID
+		for _, cp := range cartItems {
+			if cp.Selected {
+				selectedIDs = append(selectedIDs, cp.ID)
+			}
+		}
+
+		if len(selectedIDs) > 0 {
+			if err := txRepo.DeleteCartItemsByIDs(ctx, selectedIDs); err != nil {
+				return response.NewCustomError(response.ErrInternal, "failed to delete cart items", 500)
+			}
+		}
+
+		o.invalidateCartCache(ctx, customerID)
 
 		return nil
 	})

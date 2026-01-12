@@ -71,3 +71,11 @@ func (o *OrderRepositoryImpl) GetDetailCartUser(ctx context.Context, cartId uuid
 
 	return cartItems, nil
 }
+
+// DeleteCartItemsByIDs deletes cart items by their IDs.
+func (o *OrderRepositoryImpl) DeleteCartItemsByIDs(ctx context.Context, ids []uuid.UUID) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return o.db.WithContext(ctx).Where("id IN ?", ids).Delete(&model.CartItem{}).Error
+}
